@@ -1,0 +1,23 @@
+module: example
+# Walker fills `touches` when this scenario is walked against a real design.
+touches:
+  tables: []
+  ports: []
+  routes: []
+
+scenarios:
+  - id: EX-S1
+    name: Signed-out visitor is gated, then signs in
+    persona: admin
+    steps: |
+      1. In a fresh logged-out browser, open a protected URL directly.
+         Expect the login gate — no protected data may render.
+      2. Submit the login form with a wrong password.
+         Expect an inline error; still logged out.
+      3. Submit with the seeded admin credentials.
+         Expect the protected surface, under one second on seed data.
+    success_signals:
+      - Direct deep link while logged out never renders protected data.
+      - Wrong password leaves the session empty.
+      - Seeded admin reaches the protected surface.
+      - "EXPERIENCE: submit-to-ready in under 1 second against seed data; the form is password-manager friendly."
