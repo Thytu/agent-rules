@@ -17,6 +17,7 @@ Not a product. Use this template, fill the `REPLACE_ME` fields, then add the app
 |---|---|
 | `AGENTS.md` | The only agent-facing map. Vendor names (`CLAUDE.md`, …) are shims. |
 | `SCOPE.md` | What to build. The only place cuts are authorized. |
+| `.agents/skills/` | Auto-discovered workflows for PRs, root-cause analysis, judge convergence, and headless lanes. |
 | `docs/rules/` | Platform, house conventions, process, design, harness survival. |
 | `docs/scenarios/` | Definition of done. Reviewers execute these, not checklists. |
 | `VERIFICATION.md` | How an agent proves a feature against the real thing. |
