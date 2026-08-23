@@ -251,6 +251,58 @@ event.uid = "session-" + session.id + "@openrostrum.com";`,
 		violations: [],
 	},
 
+	// ---- lifecycle and cost: violations ----
+	{
+		id: "lifecycle-detached-task",
+		file: "app/jobs/import.ts",
+		code: `export function startImport(provider, batch) {
+	void provider.import(batch);
+	return { status: "started" };
+}`,
+		violations: ["engineering"],
+	},
+	{
+		id: "lifecycle-unbounded-history",
+		file: "app/lib/transcript-stream.ts",
+		code: `export class TranscriptStream {
+	chunks = [];
+	onChunk(chunk) { this.chunks.push(chunk); }
+}`,
+		violations: ["engineering"],
+	},
+	{
+		id: "cost-reparse-in-loop",
+		file: "app/lib/route-events.ts",
+		code: `export function routeEvents(env, events) {
+	for (const event of events) {
+		const routes = JSON.parse(env.ROUTES);
+		deliver(routes[event.type], event);
+	}
+}`,
+		violations: ["engineering"],
+	},
+
+	// ---- lifecycle and cost: clean traps ----
+	{
+		id: "ok-owned-background-task",
+		file: "app/jobs/import.ts",
+		code: `export function startImport(provider, batch) {
+	const controller = new AbortController();
+	const result = provider.import(batch, { signal: controller.signal });
+	return { cancel: () => controller.abort(), result };
+}`,
+		violations: [],
+	},
+	{
+		id: "ok-parse-once-before-loop",
+		file: "app/lib/route-events.ts",
+		code: `export function routeEvents(env, events) {
+	const routes = Routes.parse(JSON.parse(env.ROUTES));
+	for (const event of events) deliver(routes[event.type], event);
+}`,
+		violations: [],
+	},
+
 	// ---- mixed + clean ----
 	{
 		id: "mixed-bs-and-shortcut",

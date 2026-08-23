@@ -96,3 +96,6 @@ dist
 # Nested worktrees: biome reads this file via vcs.useIgnoreFile; eslint ignores
 # .claude/** in flat config. Without this, root lint walks the copies.
 .claude/worktrees/
+
+# Rust build output. Cargo.lock is intentionally committed for applications.
+target/

@@ -19,3 +19,12 @@ Fill a row when the surface exists. Each row needs a cold-start how-to and a smo
 
 - Cloud singletons (prod DB, live keys, real third parties) belong to the integration lane. Feature agents verify against local oracles.
 - Local green ≠ deployed green. The deployed smoke is the oracle that counts.
+
+## Evidence by change kind
+
+- **Bug fix:** reproduce the failure before the change, then exercise the same path and observe that it no longer fails.
+- **Functional or API change:** run the repository gate, then exercise the changed contract through its real boundary.
+- **UI change:** use the running surface and verify interaction, loading, empty, error, permission, keyboard, and narrow-viewport behavior that the change can affect.
+- **Provider or infrastructure change:** verify both product state and the provider's real resource state, including cleanup.
+
+Compilation, types, lint, unit tests, mocks, and repository checks are necessary evidence where applicable. None substitutes for the product smoke.

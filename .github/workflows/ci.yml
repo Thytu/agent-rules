@@ -5,9 +5,17 @@ on:
     branches: [main]
   pull_request:
 
+permissions:
+  contents: read
+
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
+
+env:
+  CARGO_INCREMENTAL: "0"
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: "1"
 
 jobs:
   # Every PR MUST target main. No stacked PRs onto integration/* or any other
@@ -15,6 +23,7 @@ jobs:
   # (and its commits silently ride along in whatever else descends from it).
   # Keeps history flat and every PR independently reviewable+mergeable.
   require-base-main:
+    name: PR targets main
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     steps:
@@ -30,6 +39,7 @@ jobs:
   # on branches prefixed `integration/` (or direct pushes to main).
   # Keep this regex in lockstep with scripts/guard-shared.sh.
   guard-shared-files:
+    name: Shared-file ownership
     if: github.event_name == 'pull_request' && !startsWith(github.head_ref, 'integration/')
     runs-on: ubuntu-latest
     steps:
@@ -40,8 +50,8 @@ jobs:
         run: |
           changed="$(git diff --name-only "origin/${{ github.base_ref }}"...HEAD)"
           if printf '%s\n' "$changed" | grep -Eq \
-            '^(package\.json|pnpm-lock\.yaml)$'; then
-            echo "::error::This branch edits an integration-owned shared file (package.json / lockfile)."
+            '^(package\.json|pnpm-lock\.yaml|Cargo\.toml|Cargo\.lock|rust-toolchain\.toml|rustfmt\.toml|clippy\.toml|deny\.toml|biome\.json|eslint\.config\.mjs|commitlint\.config\.mjs|lefthook\.yml|\.cargo/.*|\.github/workflows/.*|\.github/dependabot\.yml|scripts/(guard-shared|setup-github|setup-rust-tools|verify-rust)\.sh)$'; then
+            echo "::error::This branch edits an integration-owned manifest, lockfile, toolchain, or policy path."
             echo "::error::Request the change from the integration owner, or ship it on an integration/* branch."
             exit 1
           fi
@@ -95,10 +105,13 @@ jobs:
         run: node tooling/pr-review/ci-review.mjs
 
   quality-checks:
-    name: quality checks
+    name: Template quality
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - name: Install pinned Rust profile tools
+        if: hashFiles('Cargo.toml') != ''
+        run: bash scripts/setup-rust-tools.sh
       - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
         with:
@@ -113,3 +126,5 @@ jobs:
         run: pnpm lint
       - name: Test tooling
         run: pnpm test:tooling
+      - name: Verify Rust profile
+        run: bash scripts/verify-rust.sh

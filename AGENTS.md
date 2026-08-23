@@ -17,6 +17,7 @@ You are building production software a real user runs. Cuts come only from `SCOP
 | What to build | starting any feature | `SCOPE.md` |
 | Definition of done | before AND after building | `docs/scenarios/` |
 | Platform (wins conflicts) | writing any code | `docs/rules/tech-stack.md` |
+| Rust profile | writing Rust or changing Cargo files | `docs/profiles/rust.md` |
 | House conventions | writing any code or tests | `docs/rules/engineering.md` |
 | Process — git, worktrees, shared files | schema/deps/git/sequencing | `docs/rules/process.md` |
 | Design system | building any UI | `docs/rules/design-system.md` |

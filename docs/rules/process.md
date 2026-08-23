@@ -6,6 +6,10 @@ Schema, migrations, seed, `package.json`, the lockfile, platform config, and des
 
 Edit the guarded path list at the top of `scripts/guard-shared.sh` when this repo's paths exist.
 
+When present, workspace manifests, lockfiles, toolchain and lint configuration, CI, release configuration, protocol schemas, migrations, and shared primitives are integration-owned too.
+
+A dependency change is one atomic change: manifest, lockfile, first use or removal, supply-chain policy result, and unused-dependency result. Tool versions are exact; application resolution is reproducible from the committed lockfile.
+
 ## Design-time gate (integration owner)
 
 Any change to schema, a port, or a spec must **re-walk** the scenarios whose `touches:` header names the changed artifact — produce the concrete artifact for each affected step, not a mechanism name. Walk every matching step. The affected / unaffected determination is made DURING the walk — never by pre-filtering the step list.
@@ -16,7 +20,9 @@ Each worktree is a full instance: unique port, cwd-local state, no service bindi
 
 ## Verification
 
-`pnpm verify` = map check + lint + tooling tests, and it must pass before commit. Formatting is Biome (`pnpm format`). A lefthook pre-commit runs format + lint + the shared-file guard + the AGENTS.md map check. Pre-push runs `pnpm verify`.
+`pnpm verify` = map check + lint + tooling tests + the conditional Rust profile gate, and it must pass before commit. Formatting is Biome (`pnpm format`). A lefthook pre-commit runs format + lint + the shared-file guard + the AGENTS.md map check + the fast Rust gate. Pre-push runs `pnpm verify`.
+
+Repository checks and product verification are separate gates. The repository gate runs without exclusions, warning allowances, changed files, or live credentials. CI reruns it from a clean checkout; local success never overrides a failed required check.
 
 ## Agent harness — one map, vendor shims [hook-enforced: `scripts/check-map.sh`]
 
@@ -30,7 +36,7 @@ Each worktree is a full instance: unique port, cwd-local state, no service bindi
 
 **Reviewer obligation:** *"can this branch be deleted losing nothing — does the description carry every decision made along the way?"* No → the description is fixed before merge.
 
-**Repo-setup checklist (when the GitHub remote is created):** `bash scripts/setup-github.sh` — ruleset on ALL branches blocking force pushes · main takes PRs only · squash-only merging with default message "PR title and description" · auto-delete head branches. Settings do not copy with "Use this template".
+**Repo-setup checklist (when the GitHub remote is created):** `bash scripts/setup-github.sh` — ruleset on ALL branches blocking force pushes · main takes PRs only · squash-only merging with default message "PR title and description" · review threads resolved · required CI checks green · auto-delete head branches. Settings do not copy with "Use this template".
 
 ## Build sequencing (waves)
 

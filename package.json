@@ -16,7 +16,7 @@
 		"format:check": "biome format .",
 		"test:tooling": "node --test tooling/*/*.test.node.mjs",
 		"prepare": "lefthook install",
-		"verify": "bash scripts/check-map.sh && pnpm lint && pnpm test:tooling"
+		"verify": "bash scripts/check-map.sh && pnpm lint && pnpm test:tooling && bash scripts/verify-rust.sh"
 	},
 	"devDependencies": {
 		"@biomejs/biome": "^2.5.7",

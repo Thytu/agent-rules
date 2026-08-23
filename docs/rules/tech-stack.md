@@ -24,6 +24,10 @@ The locked stack. If something here conflicts with another doc, this wins.
 
 Exact patch versions are frozen in `package.json`.
 
+## Optional Rust profile
+
+When `Cargo.toml` exists, [`docs/profiles/rust.md`](../profiles/rust.md) is mandatory in addition to this file. It defines the workspace, toolchain, quality, dependency, ownership, async, and unsafe-code contract. The presence of `Cargo.toml` activates the Rust repository gate and Rust rule-owner review; non-Rust repositories pay neither cost.
+
 ## Ports (the only swappable seams)
 
 Everything that differs between local and cloud sits behind a typed interface with a local and a prod adapter. Nothing else gets a port.

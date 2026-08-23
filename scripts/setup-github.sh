@@ -60,11 +60,23 @@ upsert_ruleset "Main is PR-only" '{
         "dismiss_stale_reviews_on_push": false,
         "require_code_owner_review": false,
         "require_last_push_approval": false,
-        "required_review_thread_resolution": false,
+        "required_review_thread_resolution": true,
         "allowed_merge_methods": ["squash"]
+      }
+    },
+    {
+      "type": "required_status_checks",
+      "parameters": {
+        "strict_required_status_checks_policy": true,
+        "do_not_enforce_on_create": false,
+        "required_status_checks": [
+          { "context": "PR targets main" },
+          { "context": "Shared-file ownership" },
+          { "context": "Template quality" }
+        ]
       }
     }
   ]
 }'
 
-echo "setup-github: ${repo} — squash-only, auto-delete heads, no force-push, main is PR-only."
+echo "setup-github: ${repo} — squash-only, auto-delete heads, no force-push, resolved threads, and required CI checks."

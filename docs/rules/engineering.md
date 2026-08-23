@@ -55,6 +55,20 @@ A value's shape is settled where it enters the program, never re-litigated downs
 
 `Array.isArray` is the sanctioned array check (`instanceof Array` is not). An object schema pairing an enum with several optional siblings is a discriminated union that hasn't admitted it yet.
 
+## Failures and resource lifecycle
+
+Failures remain failures until a boundary deliberately presents them. Never discard an error, turn it into an empty success, or retry work that is not proven idempotent. Errors carry enough typed context to identify the failed operation without leaking secrets to users.
+
+Every background task, subprocess, stream, subscription, and external resource has an owner, cancellation path, and observed terminal result. Model desired and observed external state separately; recover by reconciling against provider truth, not by trusting the last local write. Create and destroy operations use stable idempotency keys.
+
+Queues, retained history, uploads, retries, and concurrency are bounded. State what happens at capacity. A timeout belongs at an external boundary and produces an explicit outcome rather than silent fallback.
+
+## Cost model
+
+Do not allocate, copy, serialize, fetch, parse, or recompute invariant data in a repeated path when ownership or initialization can make the work happen once. Reuse compiled patterns, provider clients, parsed configuration, and invariant paths. Add caches only after measurement identifies the miss cost and the invalidation contract is explicit.
+
+Compiled code is not permission to waste work. Language-specific ownership guidance lives in the mapped stack profile.
+
 ## Tests — every test must be able to catch a regression [lint-enforced: `meaningful-tests`]
 
 A test earns its place only by pinning a contract the code could plausibly violate later, with its expected value stated independently of the implementation — from the spec, the scenario, the bug, or the boundary, **never read off the code under test**.

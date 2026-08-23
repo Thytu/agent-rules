@@ -1,13 +1,12 @@
 # PR review — autonomous rule owners
 
-The production reviewer runs one independent DeepSeek session per dynamically
-discovered `docs/rules/*.md` document. Each session owns the entire pull request
-under its assigned rule document and decides what repository evidence to inspect.
+The production reviewer runs one independent DeepSeek session per active rule document. Base rules come from dynamically discovered `docs/rules/*.md` files; optional stack profiles join only when their repository marker exists. Each session owns the entire pull request under its assigned document and decides what repository evidence to inspect.
 
 ## Architecture
 
 - `agents.mjs` discovers and sorts every rule document; there is no maintained
   reviewer list.
+- `agents.mjs` also activates `docs/profiles/rust.md` when the repository root contains `Cargo.toml`; non-Rust repositories do not launch that session.
 - `core.mjs` loads each document verbatim, configures Pi's native DeepSeek provider
   for `deepseek-v4-flash`, and owns the answer-volume contract: the shared prompt
   preamble bans narration, progress notes, and restating the rule document, and
@@ -38,6 +37,8 @@ continuations after tool calls, bounded by turn, tool-call, request, and wall-ti
 limits; production never creates a model review per changed file. First measured
 production run: 14 changed files, five parallel sessions, 4–22 tool calls each,
 102 seconds end to end.
+
+A repository with `Cargo.toml` adds one Rust-profile session. A repository without Cargo retains the five-session shape and pays no Rust-review cost.
 
 The launcher does not rank files, create clusters, prescribe traversal order, or
 encode a delegation workflow. Its only orchestration is independent rule-owner
