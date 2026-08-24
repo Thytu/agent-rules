@@ -1,8 +1,7 @@
 // Labeled gold set for the reviewer. Each case is a small changed-file snippet;
 // `violations` is the agent id(s) — the docs/rules/<id>.md whose rules it breaks
-// (empty = clean). These synthetic cases are all engineering.md violations plus
-// deliberate clean traps (legit WHY comments, real tests, sanctioned throws) that
-// a noisy reviewer over-flags — they are how we measure false positives.
+// (empty = clean). The corpus gives every owner positive and clean traps so
+// false positives and misses remain visible after the owner split.
 
 export const cases = [
 	// ---- bs-comment: violations ----
@@ -14,14 +13,14 @@ export function incrementRetryCounter(state) {
 	state.retries += 1;
 	return state;
 }`,
-		violations: ["engineering"],
+		violations: ["comments"],
 	},
 	{
 		id: "bs-change-narration",
 		file: "app/config.ts",
 		code: `// was P2, promoted to core in the Aug refactor
 export const MAX_UPLOAD_MB = 25;`,
-		violations: ["engineering"],
+		violations: ["comments"],
 	},
 	{
 		id: "bs-tier-citation",
@@ -30,7 +29,7 @@ export const MAX_UPLOAD_MB = 25;`,
 export function loadSpeakers(db, eventId) {
 	return db.select().from(contacts).where(eq(contacts.eventId, eventId));
 }`,
-		violations: ["engineering"],
+		violations: ["comments"],
 	},
 	{
 		id: "bs-justification-prose",
@@ -41,7 +40,7 @@ export function loadSpeakers(db, eventId) {
 export function SubmissionsMock() {
 	return <div className="rounded-card border border-hair bg-surface" />;
 }`,
-		violations: ["engineering"],
+		violations: ["comments"],
 	},
 
 	// ---- bs-comment: clean traps ----
@@ -52,6 +51,7 @@ export function SubmissionsMock() {
 // throws only in production (workerd does not enforce it locally).
 const PBKDF2_ITERATIONS = 100_000;`,
 		violations: [],
+		cleanFor: ["comments"],
 	},
 	{
 		id: "ok-platform-why",
@@ -85,7 +85,7 @@ const eventId = (await getActiveEvent(env, user)).id;`,
 	await notify({ send }, { to: "a@b.com" });
 	expect(send).toHaveBeenCalledWith({ to: "a@b.com" });
 });`,
-		violations: ["engineering"],
+		violations: ["testing"],
 	},
 	{
 		id: "weak-rederived-oracle",
@@ -95,7 +95,7 @@ const eventId = (await getActiveEvent(env, user)).id;`,
 	const expected = items.reduce((s, i) => s + i.price, 0);
 	expect(sumPrices(items)).toBe(expected);
 });`,
-		violations: ["engineering"],
+		violations: ["testing"],
 	},
 	{
 		id: "weak-copy-literal",
@@ -104,7 +104,7 @@ const eventId = (await getActiveEvent(env, user)).id;`,
 it("has welcome copy", () => {
 	expect(WELCOME_COPY).toContain("Welcome to the call for speakers");
 });`,
-		violations: ["engineering"],
+		violations: ["testing"],
 	},
 	{
 		id: "weak-snapshot",
@@ -112,7 +112,7 @@ it("has welcome copy", () => {
 		code: `it("renders the panel", () => {
 	expect(render(Panel()).container.innerHTML).toMatchSnapshot();
 });`,
-		violations: ["engineering"],
+		violations: ["testing"],
 	},
 
 	// ---- weak-test: clean traps ----
@@ -126,6 +126,7 @@ it("has welcome copy", () => {
 	expect(rows).toHaveLength(1);
 });`,
 		violations: [],
+		cleanFor: ["testing"],
 	},
 	{
 		id: "ok-load-bearing-negative",
@@ -147,7 +148,7 @@ it("has welcome copy", () => {
 export async function allSubmissions(db) {
 	return db.select().from(submissions);
 }`,
-		violations: ["engineering"],
+		violations: ["contract-evolution"],
 	},
 	{
 		id: "shortcut-hardcoded-id",
@@ -156,7 +157,7 @@ export async function allSubmissions(db) {
 	// for now just grab the seeded event
 	return db.query.events.findFirst({ where: eq(events.id, "evt_demo_123") });
 }`,
-		violations: ["engineering"],
+		violations: ["contract-evolution"],
 	},
 	{
 		id: "shortcut-swallowed-error",
@@ -168,7 +169,7 @@ export async function allSubmissions(db) {
 		// ignore
 	}
 }`,
-		violations: ["engineering"],
+		violations: ["boundaries"],
 	},
 	{
 		id: "shortcut-noop-validation",
@@ -177,7 +178,7 @@ export async function allSubmissions(db) {
 	// v0, skip validation for now, revisit later
 	return true;
 }`,
-		violations: ["engineering"],
+		violations: ["contract-evolution"],
 	},
 
 	// ---- shortcut: clean traps ----
@@ -191,6 +192,7 @@ export async function allSubmissions(db) {
 	return new AirtableSync(env);
 }`,
 		violations: [],
+		cleanFor: ["boundaries", "contract-evolution"],
 	},
 	{
 		id: "ok-bounded-logged",
@@ -211,7 +213,7 @@ export async function allSubmissions(db) {
 		code: `export { EmailSender } from "./sender";
 /** @deprecated use EmailSender */
 export { EmailSender as Mailer } from "./sender";`,
-		violations: ["engineering"],
+		violations: ["contract-evolution"],
 	},
 	{
 		id: "legacy-dual-format-reader",
@@ -221,14 +223,14 @@ export { EmailSender as Mailer } from "./sender";`,
 		? row.status
 		: (row.status?.value ?? "pending");
 }`,
-		violations: ["engineering"],
+		violations: ["contract-evolution"],
 	},
 	{
 		id: "legacy-parallel-v2",
 		file: "app/lib/serialize.ts",
 		code: `export function serializeSession(s) { return { id: s.id, title: s.title }; }
 export function serializeSessionV2(s) { return { id: s.id, title: s.title, track: s.track }; }`,
-		violations: ["engineering"],
+		violations: ["contract-evolution"],
 	},
 
 	// ---- legacy-shim: clean traps (sanctioned compat boundaries) ----
@@ -259,7 +261,7 @@ event.uid = "session-" + session.id + "@openrostrum.com";`,
 	void provider.import(batch);
 	return { status: "started" };
 }`,
-		violations: ["engineering"],
+		violations: ["lifecycle-capacity"],
 	},
 	{
 		id: "lifecycle-unbounded-history",
@@ -268,7 +270,7 @@ event.uid = "session-" + session.id + "@openrostrum.com";`,
 	chunks = [];
 	onChunk(chunk) { this.chunks.push(chunk); }
 }`,
-		violations: ["engineering"],
+		violations: ["lifecycle-capacity"],
 	},
 	{
 		id: "cost-reparse-in-loop",
@@ -279,7 +281,7 @@ event.uid = "session-" + session.id + "@openrostrum.com";`,
 		deliver(routes[event.type], event);
 	}
 }`,
-		violations: ["engineering"],
+		violations: ["efficiency"],
 	},
 
 	// ---- lifecycle and cost: clean traps ----
@@ -292,6 +294,7 @@ event.uid = "session-" + session.id + "@openrostrum.com";`,
 	return { cancel: () => controller.abort(), result };
 }`,
 		violations: [],
+		cleanFor: ["lifecycle-capacity"],
 	},
 	{
 		id: "ok-parse-once-before-loop",
@@ -301,6 +304,7 @@ event.uid = "session-" + session.id + "@openrostrum.com";`,
 	for (const event of events) deliver(routes[event.type], event);
 }`,
 		violations: [],
+		cleanFor: ["efficiency"],
 	},
 
 	// ---- mixed + clean ----
@@ -312,7 +316,7 @@ export async function getUser(db, id) {
 	// TODO: cache this later
 	return db.query.users.findFirst({ where: eq(users.id, id) });
 }`,
-		violations: ["engineering"],
+		violations: ["comments", "contract-evolution"],
 	},
 	{
 		id: "ok-documented-fallback",
@@ -324,5 +328,42 @@ export function verifyTurnstile(env, token) {
 	return callTurnstile(env.TURNSTILE_SECRET, token);
 }`,
 		violations: [],
+	},
+	{
+		id: "auth-client-tenant",
+		file: "app/lib/contacts.ts",
+		code: `export async function listContacts(db, input) {
+	return db.select().from(contacts).where(eq(contacts.eventId, input.eventId));
+}`,
+		violations: ["authorization-persistence"],
+	},
+	{
+		id: "ok-auth-server-tenant",
+		file: "app/lib/contacts.ts",
+		code: `export async function listContacts(db, request) {
+	const user = await requireUser(request);
+	return db.select().from(contacts).where(eq(contacts.tenantId, user.tenantId));
+}`,
+		violations: [],
+		cleanFor: ["authorization-persistence"],
+	},
+	{
+		id: "dependency-manifest-only",
+		file: "package.json",
+		code: `{
+	"dependencies": { "undici": "7.16.0" }
+}`,
+		violations: ["dependency-integrity"],
+	},
+	{
+		id: "ok-package-without-dependency-change",
+		file: "package.json",
+		code: `{
+	"name": "product",
+	"private": true,
+	"scripts": { "start": "node app.js" }
+}`,
+		violations: [],
+		cleanFor: ["dependency-integrity"],
 	},
 ];

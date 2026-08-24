@@ -1,7 +1,7 @@
 // Shape belongs to the boundary, not to a branch deep in the code: a runtime
 // `typeof` says the program does not know what it is holding. The remedy
 // depends on why — parse once at the boundary, or model the variant — so each
-// probed type names its own. See docs/rules/engineering.md → Shape at the boundary.
+// probed type names its own. See docs/rules/boundaries.md.
 const REMEDIES = new Map([
 	[
 		"string",
@@ -56,7 +56,7 @@ export const noRuntimeTypeof = {
 		schema: [],
 		messages: {
 			runtimeTypeof:
-				"Runtime `typeof` check. {{remedy}} See docs/rules/engineering.md → Shape at the boundary.",
+				"Runtime `typeof` check. {{remedy}} See docs/rules/boundaries.md.",
 		},
 	},
 	create(context) {

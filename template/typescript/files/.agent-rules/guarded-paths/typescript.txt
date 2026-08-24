@@ -8,4 +8,3 @@ biome.json
 tooling/eslint-rules/*
 scripts/setup-typescript.sh
 scripts/verify-typescript.sh
-docs/profiles/typescript.md

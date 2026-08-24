@@ -25,7 +25,7 @@ lists=("$root/.agent-rules/guarded-paths"/*.txt)
 [ "$mode" = source ] && lists=("$root/template/core/files/.agent-rules/guarded-paths/core.txt" "$root/template/rust/files/.agent-rules/guarded-paths/rust.txt" "$root/template/typescript/files/.agent-rules/guarded-paths/typescript.txt")
 while IFS= read -r -d '' path; do
 	if [ "$mode" = source ]; then
-		case "$path" in AGENTS.md|CLAUDE.md|package.json|pnpm-lock.yaml|.npmrc|biome.json|eslint.config.mjs|init.sh|template/*|.agents/*|.claude/*|.github/*|.githooks/*|scripts/setup-source.sh|scripts/setup-github.sh|docs/rules/*|docs/profiles/*)
+		case "$path" in AGENTS.md|CLAUDE.md|package.json|pnpm-lock.yaml|.npmrc|biome.json|eslint.config.mjs|init.sh|template/*|.agents/*|.claude/*|.github/*|.githooks/*|scripts/setup-source.sh|scripts/setup-github.sh|docs/rules/*)
 			echo "unauthorized integration-owned source path: $path" >&2
 			exit 1
 			;;

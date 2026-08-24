@@ -177,9 +177,13 @@ const mean = prf(sumTP, sumFP, sumFN);
 console.log(
 	`\nmicro-avg over ${RUNS} run(s): P=${pct(mean.precision)}%  R=${pct(mean.recall)}%  F1=${pct(mean.f1)}%`,
 );
-console.log("\nper-agent (tp/fp/fn):");
-for (const [id, scores] of Object.entries(perAgent))
-	console.log(`  ${id.padEnd(12)} ${scores.tp}/${scores.fp}/${scores.fn}`);
+console.log("\nper-agent:");
+for (const [id, scores] of Object.entries(perAgent)) {
+	const metrics = prf(scores.tp, scores.fp, scores.fn);
+	console.log(
+		`  ${id.padEnd(26)} TP=${scores.tp} FP=${scores.fp} FN=${scores.fn} P=${pct(metrics.precision)}% R=${pct(metrics.recall)}% F1=${pct(metrics.f1)}%`,
+	);
+}
 
 if (fpCount.size) {
 	console.log("\nfalse positives (case:agent → runs/total):");

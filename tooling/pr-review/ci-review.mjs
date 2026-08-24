@@ -28,7 +28,6 @@ const KEY = process.env.DEEPSEEK_API_KEY;
 const BASE = process.env.DEEPSEEK_BASE_URL || "https://api.deepseek.com";
 const MODEL = process.env.DEEPSEEK_MODEL || "deepseek-v4-flash";
 const TEMPERATURE = Number(process.env.TEMPERATURE ?? 0);
-const CONC = Number(process.env.CONC ?? 6);
 
 const GH_TOKEN = process.env.GH_TOKEN;
 const REPO = process.env.REPO;
@@ -248,7 +247,7 @@ const results = await runRuleReviewers({
 	systems,
 	repository,
 	runtime,
-	concurrency: CONC,
+	concurrency: agents.length,
 });
 const incomplete = results.filter((result) => result.status !== "complete");
 const reviewComplete = incomplete.length === 0;

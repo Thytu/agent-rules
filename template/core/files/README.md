@@ -23,4 +23,4 @@ Then:
 - `bash scripts/verify.sh --structure-only` — verify repository infrastructure while product contracts are unfinished.
 - `bash scripts/verify.sh` — complete repository and product-contract gate.
 
-Selected language details live under `docs/profiles/`.
+Selected runtime details live in manifests and configuration; `AGENTS.md` routes each task to the exact rule or verifier.

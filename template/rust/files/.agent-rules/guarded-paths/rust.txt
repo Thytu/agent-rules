@@ -8,4 +8,3 @@ deny.toml
 .cargo/*
 scripts/setup-rust.sh
 scripts/verify-rust.sh
-docs/profiles/rust.md

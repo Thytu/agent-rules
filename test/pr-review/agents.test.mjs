@@ -4,59 +4,52 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
 
-import { loadAgents } from "../../tooling/pr-review/agents.mjs";
+import { loadAgents, OWNER_BUDGET } from "../../tooling/pr-review/agents.mjs";
+
+const OWNERS = [
+	"authorization-persistence",
+	"boundaries",
+	"comments",
+	"contract-evolution",
+	"dependency-integrity",
+	"efficiency",
+	"lifecycle-capacity",
+	"testing",
+];
 
 function repository(t) {
 	const root = mkdtempSync(join(tmpdir(), "agent-rules-agents-"));
 	t.after(() => rmSync(root, { recursive: true, force: true }));
 	mkdirSync(join(root, "docs", "rules"), { recursive: true });
-	mkdirSync(join(root, "docs", "profiles"), { recursive: true });
-	writeFileSync(join(root, "docs", "rules", "zeta.md"), "# Zeta\n");
-	writeFileSync(join(root, "docs", "rules", "alpha.md"), "# Alpha\n");
-	writeFileSync(join(root, "docs", "profiles", "rust.md"), "# Rust\n");
-	writeFileSync(
-		join(root, "docs", "profiles", "typescript.md"),
-		"# TypeScript\n",
-	);
+	for (const owner of OWNERS)
+		writeFileSync(join(root, "docs", "rules", `${owner}.md`), `# ${owner}\n`);
 	return root;
 }
 
-test("Rust review is absent without a Cargo workspace", (t) => {
+const expected = OWNERS.map((id) => ({ id, doc: `docs/rules/${id}.md` }));
+
+test("discovers the exact sorted eight-owner catalog", (t) => {
 	const root = repository(t);
-	assert.deepEqual(loadAgents(root), [
-		{ id: "alpha", doc: "docs/rules/alpha.md" },
-		{ id: "zeta", doc: "docs/rules/zeta.md" },
-	]);
+	assert.equal(OWNER_BUDGET, 8);
+	assert.deepEqual(loadAgents(root), expected);
 });
 
-test("Cargo.toml activates the Rust rule owner", (t) => {
+test("runtime markers do not create profile reviewers", (t) => {
 	const root = repository(t);
 	writeFileSync(join(root, "Cargo.toml"), "[workspace]\n");
-	assert.deepEqual(loadAgents(root), [
-		{ id: "alpha", doc: "docs/rules/alpha.md" },
-		{ id: "rust", doc: "docs/profiles/rust.md" },
-		{ id: "zeta", doc: "docs/rules/zeta.md" },
-	]);
-});
-
-test("package and tsconfig activate the TypeScript rule owner", (t) => {
-	const root = repository(t);
 	writeFileSync(join(root, "package.json"), "{}\n");
 	writeFileSync(join(root, "tsconfig.json"), "{}\n");
-	assert.deepEqual(loadAgents(root), [
-		{ id: "alpha", doc: "docs/rules/alpha.md" },
-		{ id: "typescript", doc: "docs/profiles/typescript.md" },
-		{ id: "zeta", doc: "docs/rules/zeta.md" },
-	]);
+	assert.deepEqual(loadAgents(root), expected);
 });
 
-test("generator source owns every emitted profile", (t) => {
+test("a missing owner fails the declared review budget", (t) => {
 	const root = repository(t);
-	writeFileSync(join(root, "init.sh"), "#!/usr/bin/env bash\n");
-	assert.deepEqual(loadAgents(root), [
-		{ id: "alpha", doc: "docs/rules/alpha.md" },
-		{ id: "rust", doc: "docs/profiles/rust.md" },
-		{ id: "typescript", doc: "docs/profiles/typescript.md" },
-		{ id: "zeta", doc: "docs/rules/zeta.md" },
-	]);
+	rmSync(join(root, "docs", "rules", "testing.md"));
+	assert.throws(() => loadAgents(root), /count 7.*budget 8/);
+});
+
+test("a ninth owner cannot silently add a review wave", (t) => {
+	const root = repository(t);
+	writeFileSync(join(root, "docs", "rules", "rogue.md"), "# Rogue\n");
+	assert.throws(() => loadAgents(root), /count 9.*budget 8/);
 });

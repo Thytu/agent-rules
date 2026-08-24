@@ -1,10 +1,10 @@
 # PR review — autonomous rule owners
 
-The production reviewer runs one independent DeepSeek session per discovered rule document. The generator source owns every `docs/rules/*.md` and `docs/profiles/*.md`; ordinary repositories activate Rust from `Cargo.toml` and TypeScript from `package.json` plus `tsconfig.json`. Each session owns the whole pull request under its assigned document and decides what repository evidence to inspect.
+The source reviewer runs exactly eight independent DeepSeek sessions, one per top-level `docs/rules/*.md` owner. Each session owns the whole pull request under its assigned document and decides what repository evidence to inspect. Generated repositories receive the rule documents as coding guidance but no reviewer runtime or workflow.
 
 ## Architecture
 
-- `agents.mjs` discovers and sorts rule documents; there is no maintained reviewer list. Generator source reviews both emitted profiles, while marker-based repositories load only active profiles.
+- `agents.mjs` discovers and sorts the eight top-level rule documents and fails if the count differs from the declared budget. There are no profile reviewers or marker stubs.
 - `core.mjs` loads each document verbatim, configures Pi's native DeepSeek provider
   for `deepseek-v4-flash`, and owns the answer-volume contract: the shared prompt
   preamble bans narration, progress notes, and restating the rule document, and
@@ -28,7 +28,7 @@ The production reviewer runs one independent DeepSeek session per discovered rul
 - `ci-review.mjs` launches the rule-owner sessions in parallel and passes their
   findings into the existing deterministic posting pipeline in `inline.mjs`.
 
-The reviewer creates one top-level whole-PR session per discovered owner, never one model request per changed file. Sessions may make bounded model-directed continuations after tool calls; the active owner count is derived from the documents and profile markers rather than hard-coded.
+The reviewer creates eight top-level whole-PR sessions, never one model request per changed file. All eight run in one parallel wave. A ninth document fails before model use until the owner and cost contract is changed explicitly.
 
 The launcher does not rank files, create clusters, prescribe traversal order, or
 encode a delegation workflow. Its only orchestration is independent rule-owner
@@ -92,9 +92,10 @@ render as prose and are elided.
 A session is complete only after `finish_review` is called, its arguments pass a
 TypeBox schema at the boundary — no hand-rolled shape checks — and its `submitted`
 count equals what actually reached the bank. A dropped SSE stream (`terminated`,
-`other side closed`) is retried once on a fresh session. Provider errors, timeouts,
-aborted runs, exhausted budgets, a session that never closes, a second dropped
-stream, and a count that disagrees with the bank are **incomplete**, never clean.
+`other side closed`) is retried once on a fresh session using only the time left
+inside the owner's single 15-minute deadline. Provider errors, timeouts, aborted
+runs, exhausted budgets, a session that never closes, a second dropped stream,
+and a count that disagrees with the bank are **incomplete**, never clean.
 The close is read off the tool call
 and ends the session there, so closing never depends on when a tool result is
 appended relative to the turn hook.
@@ -185,23 +186,13 @@ All local reviewer tests are network-free:
 node --test test/pr-review/*.test.mjs
 ```
 
-They cover dynamic one-session-per-rule launch over a 240-file index, multi-turn
-changed and unchanged reads, Git-backed repository access and path safety,
-provider/tool/budget failure states, truncation and unparseable-answer
-diagnostics, a stated finding budget that matches the enforced one, a trimmed
-quote that still anchors, a derived output ceiling that still holds a full
-response, 24 findings reported across several responses, a session that dies with
-findings banked, a session that never reaches the completion signal, duplicate
-submission, a submission citing an unchanged file, a submission that fails the
-schema, a terminal count that disagrees with the bank, the per-response cap and
-its re-issue, a reviewer that ends in prose being re-asked once and recovering, a
-reviewer that misses the signal twice staying incomplete, findings surviving a
-re-ask, a reviewer that submits through the whole close allowance still ending
-complete because the close is all it is left, a dropped stream retried once to
-completion, a second drop staying incomplete, a named provider failure not
-retried, a run summary that reports the extra ask and a forced close only when each happened,
-anchoring, fingerprints, dedupe, reconciliation, stale deferral, and posting
-payloads. CI runs this complete set in its unconditional quality job.
+They cover the exact eight-owner budget and one-wave launch over a 240-file index,
+multi-turn changed and unchanged reads, Git-backed repository access and path
+safety, provider/tool/budget failure states, a retry sharing the original owner
+deadline, truncation and unparseable-answer diagnostics, finding-budget
+enforcement, incremental submission, completion signaling, anchoring,
+fingerprints, dedupe, reconciliation, stale deferral, and posting payloads. CI
+runs this complete network-free set in its unconditional quality job.
 
 A local production dry run performs real DeepSeek sessions but no GitHub writes:
 
@@ -226,7 +217,8 @@ DEEPSEEK_API_KEY=... DEEPSEEK_MODEL=deepseek-v4-flash \
 DEEPSEEK_API_KEY=... node tooling/pr-review/review.mjs dev
 ```
 
-The former 99.0% F1 / 98.1% precision / 100% recall numbers measured the removed
-per-file majority-of-three architecture. They are historical and are not claimed
-for the autonomous reviewer. The fixture corpus remains available, but the new
-architecture must establish its own baseline through the agentic harness above.
+The evaluator prints micro and per-owner precision, recall, and F1. Development
+cases are available while tuning; holdout cases remain separate to expose
+overfitting. Results are a baseline only when every owner completes.
+
+The committed corpus has 36 development and 43 holdout fixtures. With eight owners, one run costs 288 and 344 sessions respectively, or 632 sessions for both.

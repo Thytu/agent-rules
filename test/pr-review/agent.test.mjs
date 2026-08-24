@@ -21,7 +21,7 @@ import { anchorFinding } from "../../tooling/pr-review/inline.mjs";
 
 const stop = (value) => fauxAssistantMessage(JSON.stringify(value));
 
-const ENGINEERING = { id: "engineering", doc: "docs/rules/engineering.md" };
+const BOUNDARIES = { id: "boundaries", doc: "docs/rules/boundaries.md" };
 
 // One submitted finding, one response's worth of submissions, and the terminal
 // completion signal — the three moves the incremental contract is made of.
@@ -192,7 +192,7 @@ test("Pi keeps one session across model-selected changed and unchanged reads", a
 	);
 
 	const result = await runRuleReviewer({
-		agent: { id: "engineering", doc: "docs/rules/engineering.md" },
+		agent: { id: "boundaries", doc: "docs/rules/boundaries.md" },
 		system: "SYSTEM RULE",
 		repository: repo,
 		runtime,
@@ -214,7 +214,7 @@ test("Pi keeps one session across model-selected changed and unchanged reads", a
 		["diff-call", "read-call"],
 	);
 	assert.equal(result.status, "complete");
-	assert.equal(result.findings[0].agent, "engineering");
+	assert.equal(result.findings[0].agent, "boundaries");
 });
 
 // The overflow this contract lost to was prose: DeepSeek caps a completion at
@@ -233,7 +233,7 @@ test("every request forces the response to be tool calls", async () => {
 	};
 
 	const result = await runRuleReviewer({
-		agent: ENGINEERING,
+		agent: BOUNDARIES,
 		system: "SYSTEM RULE",
 		repository: repository(THREE_FILES),
 		runtime: observed,
@@ -259,7 +259,7 @@ test("closing the review ends the session without another request", async () => 
 	]);
 
 	const result = await runRuleReviewer({
-		agent: ENGINEERING,
+		agent: BOUNDARIES,
 		system: "SYSTEM RULE",
 		repository: repository(THREE_FILES),
 		runtime,
@@ -278,7 +278,7 @@ test("a close that miscounts the bank is incomplete and keeps the findings", asy
 	const { runtime } = fauxRuntime(twice(done(7)));
 
 	const result = await runRuleReviewer({
-		agent: ENGINEERING,
+		agent: BOUNDARIES,
 		system: "SYSTEM RULE",
 		repository: repository(THREE_FILES),
 		runtime,
@@ -310,7 +310,7 @@ test("a terminal response that is not the completion signal is incomplete, not a
 	);
 
 	const result = await runRuleReviewer({
-		agent: { id: "engineering", doc: "docs/rules/engineering.md" },
+		agent: { id: "boundaries", doc: "docs/rules/boundaries.md" },
 		system: "SYSTEM RULE",
 		repository: repository([{ status: "M", path: "app/x.ts" }]),
 		runtime,
@@ -329,7 +329,7 @@ test("an unparseable terminal answer names what the model emitted", async () => 
 	const { runtime } = fauxRuntime(twice(fauxAssistantMessage(narration)));
 
 	const narrated = await runRuleReviewer({
-		agent: ENGINEERING,
+		agent: BOUNDARIES,
 		system: "SYSTEM RULE",
 		repository: repository([{ status: "M", path: "app/x.ts" }]),
 		runtime,
@@ -345,7 +345,7 @@ test("an unparseable terminal answer names what the model emitted", async () => 
 	assert.match(narrated.reason, /starting "I checked every changed file/);
 
 	const silent = await runRuleReviewer({
-		agent: ENGINEERING,
+		agent: BOUNDARIES,
 		system: "SYSTEM RULE",
 		repository: repository([{ status: "M", path: "app/x.ts" }]),
 		runtime: fauxRuntime(twice(fauxAssistantMessage(""))).runtime,
@@ -369,7 +369,7 @@ test("the finding budget the prompt states is the budget enforced", async () => 
 	]);
 
 	await runRuleReviewer({
-		agent: ENGINEERING,
+		agent: BOUNDARIES,
 		system: "SYSTEM RULE",
 		repository: repository([{ status: "M", path: "app/x.ts" }]),
 		runtime,
@@ -402,7 +402,7 @@ test("an over-long finding is trimmed to the budget and still anchors", async ()
 	]);
 
 	const result = await runRuleReviewer({
-		agent: ENGINEERING,
+		agent: BOUNDARIES,
 		system: "SYSTEM RULE",
 		repository: repository([{ status: "M", path: "app/x.ts" }]),
 		runtime,
@@ -462,7 +462,7 @@ test("a truncated answer reports its size against the ceiling requested", async 
 	measured.model = { ...runtime.model, maxTokens: 262_144 };
 
 	const result = await runRuleReviewer({
-		agent: ENGINEERING,
+		agent: BOUNDARIES,
 		system: "SYSTEM RULE",
 		repository: repository([{ status: "M", path: "app/x.ts" }]),
 		runtime: measured,
@@ -486,7 +486,7 @@ test("provider failure and turn exhaustion are incomplete", async () => {
 		}),
 	]).runtime;
 	const failed = await runRuleReviewer({
-		agent: { id: "engineering", doc: "docs/rules/engineering.md" },
+		agent: { id: "boundaries", doc: "docs/rules/boundaries.md" },
 		system: "SYSTEM RULE",
 		repository: repository([{ status: "M", path: "app/x.ts" }]),
 		runtime: failedRuntime,
@@ -505,7 +505,7 @@ test("provider failure and turn exhaustion are incomplete", async () => {
 		),
 	);
 	const exhausted = await runRuleReviewer({
-		agent: { id: "engineering", doc: "docs/rules/engineering.md" },
+		agent: { id: "boundaries", doc: "docs/rules/boundaries.md" },
 		system: "SYSTEM RULE",
 		repository: repository([{ status: "M", path: "app/x.ts" }], {
 			list_repository: { ok: true, paths: [] },
@@ -528,7 +528,7 @@ test("a dropped stream is retried once and can still complete", async () => {
 	]);
 
 	const result = await runRuleReviewer({
-		agent: ENGINEERING,
+		agent: BOUNDARIES,
 		system: "SYSTEM RULE",
 		repository: repository(THREE_FILES),
 		runtime,
@@ -537,6 +537,35 @@ test("a dropped stream is retried once and can still complete", async () => {
 	assert.equal(result.status, "complete", result.reason);
 	assert.equal(result.retried, 1);
 	assert.equal(result.findings.length, 0);
+	assert.equal(faux.state.callCount, 2);
+});
+
+test("a transport retry shares the original wall-clock deadline", async () => {
+	const { runtime, faux } = fauxRuntime([
+		async () => {
+			await new Promise((resolve) => setTimeout(resolve, 60));
+			return fauxAssistantMessage("", {
+				stopReason: "error",
+				errorMessage: "terminated",
+			});
+		},
+		async () => {
+			await new Promise((resolve) => setTimeout(resolve, 60));
+			return done(0);
+		},
+	]);
+
+	const result = await runRuleReviewer({
+		agent: BOUNDARIES,
+		system: "SYSTEM RULE",
+		repository: repository(THREE_FILES),
+		runtime,
+		limits: { timeoutMs: 100 },
+	});
+
+	assert.equal(result.status, "incomplete");
+	assert.match(result.reason, /timeout/i);
+	assert.equal(result.retried, 1);
 	assert.equal(faux.state.callCount, 2);
 });
 
@@ -553,7 +582,7 @@ test("a second dropped stream stays incomplete", async () => {
 	]);
 
 	const result = await runRuleReviewer({
-		agent: ENGINEERING,
+		agent: BOUNDARIES,
 		system: "SYSTEM RULE",
 		repository: repository(THREE_FILES),
 		runtime,
@@ -575,7 +604,7 @@ test("a named provider failure is not retried as a dropped stream", async () => 
 	]);
 
 	const result = await runRuleReviewer({
-		agent: ENGINEERING,
+		agent: BOUNDARIES,
 		system: "SYSTEM RULE",
 		repository: repository(THREE_FILES),
 		runtime,
@@ -623,7 +652,7 @@ test("a reviewer reports many findings without any response carrying them all", 
 	]);
 
 	const result = await runRuleReviewer({
-		agent: ENGINEERING,
+		agent: BOUNDARIES,
 		system: "SYSTEM RULE",
 		repository: repository(THREE_FILES),
 		runtime,
@@ -636,9 +665,7 @@ test("a reviewer reports many findings without any response carrying them all", 
 		result.findings.map((finding) => finding.quote),
 		findings.map((finding) => finding.quote),
 	);
-	assert.ok(
-		result.findings.every((finding) => finding.agent === "engineering"),
-	);
+	assert.ok(result.findings.every((finding) => finding.agent === "boundaries"));
 	// The whole point: 24 findings arrived over three capped responses and a
 	// close that carries one integer, so no response ever held the review.
 	assert.equal(faux.state.callCount, 4);
@@ -659,7 +686,7 @@ test("findings banked before a session dies still post, and the session still fa
 	]);
 
 	const result = await runRuleReviewer({
-		agent: ENGINEERING,
+		agent: BOUNDARIES,
 		system: "SYSTEM RULE",
 		repository: repository(THREE_FILES),
 		runtime,
@@ -668,9 +695,7 @@ test("findings banked before a session dies still post, and the session still fa
 	assert.equal(result.status, "incomplete");
 	assert.match(result.reason, /provider unavailable/);
 	assert.equal(result.findings.length, 2);
-	assert.ok(
-		result.findings.every((finding) => finding.agent === "engineering"),
-	);
+	assert.ok(result.findings.every((finding) => finding.agent === "boundaries"));
 });
 
 // Reaching the last turn without the completion signal is the case the contract
@@ -687,7 +712,7 @@ test("a session that never reaches the terminal signal is incomplete with its fi
 	]);
 
 	const result = await runRuleReviewer({
-		agent: ENGINEERING,
+		agent: BOUNDARIES,
 		system: "SYSTEM RULE",
 		repository: repository(THREE_FILES),
 		runtime,
@@ -721,7 +746,7 @@ test("submitting the same finding twice records it once", async () => {
 	]);
 
 	const result = await runRuleReviewer({
-		agent: ENGINEERING,
+		agent: BOUNDARIES,
 		system: "SYSTEM RULE",
 		repository: repository(THREE_FILES),
 		runtime,
@@ -750,7 +775,7 @@ test("a finding citing a file the pull request does not change is refused, not b
 	]);
 
 	const result = await runRuleReviewer({
-		agent: ENGINEERING,
+		agent: BOUNDARIES,
 		system: "SYSTEM RULE",
 		repository: repository(THREE_FILES),
 		runtime,
@@ -785,7 +810,7 @@ test("a submission that reports compliance rather than a violation is refused", 
 	]);
 
 	const result = await runRuleReviewer({
-		agent: ENGINEERING,
+		agent: BOUNDARIES,
 		system: "SYSTEM RULE",
 		repository: repository(THREE_FILES),
 		runtime,
@@ -812,7 +837,7 @@ test("a real finding that names a missing guard is not mistaken for compliance",
 	const { runtime } = fauxRuntime([submits([real], "a"), done(1)]);
 
 	const result = await runRuleReviewer({
-		agent: ENGINEERING,
+		agent: BOUNDARIES,
 		system: "SYSTEM RULE",
 		repository: repository(THREE_FILES),
 		runtime,
@@ -839,7 +864,7 @@ test("a submission that fails the finding schema is refused, not banked", async 
 	]);
 
 	const result = await runRuleReviewer({
-		agent: ENGINEERING,
+		agent: BOUNDARIES,
 		system: "SYSTEM RULE",
 		repository: repository(THREE_FILES),
 		runtime,
@@ -863,7 +888,7 @@ test("a terminal count that disagrees with what was submitted is incomplete", as
 	]);
 
 	const result = await runRuleReviewer({
-		agent: ENGINEERING,
+		agent: BOUNDARIES,
 		system: "SYSTEM RULE",
 		repository: repository(THREE_FILES),
 		runtime,
@@ -890,7 +915,7 @@ test("submissions past the per-response cap are refused and can be re-issued", a
 	]);
 
 	const result = await runRuleReviewer({
-		agent: ENGINEERING,
+		agent: BOUNDARIES,
 		system: "SYSTEM RULE",
 		repository: repository(THREE_FILES),
 		runtime,
@@ -934,7 +959,7 @@ test("a reviewer that ends in prose is asked once more for the signal", async ()
 	]);
 
 	const result = await runRuleReviewer({
-		agent: ENGINEERING,
+		agent: BOUNDARIES,
 		system: "SYSTEM RULE",
 		repository: repository(THREE_FILES),
 		runtime,
@@ -956,7 +981,7 @@ test("a reviewer that ends in prose is asked once more for the signal", async ()
 test("a session reports whether it needed the extra ask", async () => {
 	const session = (responses) =>
 		runRuleReviewer({
-			agent: ENGINEERING,
+			agent: BOUNDARIES,
 			system: "SYSTEM RULE",
 			repository: repository(THREE_FILES),
 			runtime: fauxRuntime(responses).runtime,
@@ -983,7 +1008,7 @@ test("a reviewer that misses the signal twice is incomplete", async () => {
 	]);
 
 	const result = await runRuleReviewer({
-		agent: ENGINEERING,
+		agent: BOUNDARIES,
 		system: "SYSTEM RULE",
 		repository: repository(THREE_FILES),
 		runtime,
@@ -1005,7 +1030,7 @@ test("findings banked before a missed signal survive the re-ask", async () => {
 	]);
 
 	const result = await runRuleReviewer({
-		agent: ENGINEERING,
+		agent: BOUNDARIES,
 		system: "SYSTEM RULE",
 		repository: repository(THREE_FILES),
 		runtime,
@@ -1022,7 +1047,7 @@ test("findings banked before a missed signal survive the re-ask", async () => {
 // a run stops reporting the numbers before it.
 test("the run summary reports a re-ask only when there was one", () => {
 	const session = {
-		agent: "engineering",
+		agent: "boundaries",
 		findings: [violation(0)],
 		turns: 4,
 		toolCalls: 7,
@@ -1079,7 +1104,7 @@ test("a reviewer still reading at its budget is asked to close, and does", async
 	]);
 
 	const result = await runRuleReviewer({
-		agent: ENGINEERING,
+		agent: BOUNDARIES,
 		system: "SYSTEM RULE",
 		repository: repository(THREE_FILES, {
 			read_file: () => ({ ok: true, content: "1: export const value = 1;" }),
@@ -1146,7 +1171,7 @@ test("the closing request offers no way to keep reading", async () => {
 	};
 
 	const result = await runRuleReviewer({
-		agent: ENGINEERING,
+		agent: BOUNDARIES,
 		system: "SYSTEM RULE",
 		repository: repository(THREE_FILES, {
 			read_file: () => ({ ok: true, content: "1: export const value = 1;" }),
@@ -1199,7 +1224,7 @@ test("a reviewer that submits through the close allowance is left only the close
 
 	const INVESTIGATION = 2;
 	const result = await runRuleReviewer({
-		agent: ENGINEERING,
+		agent: BOUNDARIES,
 		system: "SYSTEM RULE",
 		repository: repository(THREE_FILES),
 		runtime: watched,
@@ -1254,7 +1279,7 @@ test("a close that lands on the last allowed turn is taken, not overridden", asy
 	);
 
 	const result = await runRuleReviewer({
-		agent: ENGINEERING,
+		agent: BOUNDARIES,
 		system: "SYSTEM RULE",
 		repository: repository(THREE_FILES),
 		runtime,
@@ -1275,7 +1300,7 @@ test("a close that lands on the last allowed turn is taken, not overridden", asy
 // cannot tell the two apart hides how often the reviewers actually converge.
 test("the run summary says when the close had to be forced", () => {
 	const session = {
-		agent: "engineering",
+		agent: "boundaries",
 		status: "complete",
 		turns: 12,
 		toolCalls: 30,

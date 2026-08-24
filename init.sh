@@ -45,24 +45,30 @@ copy_tree() {
 }
 
 copy_tree "$root/template/core/files" "$out"
-mkdir -p "$out/docs/rules" "$out/docs/profiles"
+mkdir -p "$out/docs/rules"
 cp -a "$root/docs/rules/." "$out/docs/rules/"
-fragments=("$root/template/core/gitignore.entries")
+gitignore_fragments=("$root/template/core/gitignore.entries")
+map_fragments=()
 
 if [[ ",$selection," == *,rust,* ]]; then
 	copy_tree "$root/template/rust/files" "$out"
-	cp -a "$root/docs/profiles/rust.md" "$out/docs/profiles/rust.md"
-	fragments+=("$root/template/rust/gitignore.entries")
+	gitignore_fragments+=("$root/template/rust/gitignore.entries")
+	map_fragments+=("$root/template/rust/agent-map.rows")
 fi
 if [[ ",$selection," == *,typescript,* ]]; then
 	copy_tree "$root/template/typescript/files" "$out"
 	copy_tree "$root/tooling/eslint-rules" "$out/tooling/eslint-rules"
 	copy_tree "$root/test/eslint" "$out/test/eslint"
-	cp -a "$root/docs/profiles/typescript.md" "$out/docs/profiles/typescript.md"
-	fragments+=("$root/template/typescript/gitignore.entries")
+	gitignore_fragments+=("$root/template/typescript/gitignore.entries")
+	map_fragments+=("$root/template/typescript/agent-map.rows")
 fi
 
-awk '!seen[$0]++' "${fragments[@]}" > "$out/.gitignore"
+map_rows="$tmp/agent-map.rows"
+: > "$map_rows"
+for fragment in "${map_fragments[@]}"; do cat "$fragment" >> "$map_rows"; done
+awk -v rows="$map_rows" '$0 == "<!-- LANGUAGE_ROWS -->" { while ((getline line < rows) > 0) print line; close(rows); next } { print }' "$out/AGENTS.md" > "$tmp/AGENTS.md"
+mv "$tmp/AGENTS.md" "$out/AGENTS.md"
+awk '!seen[$0]++' "${gitignore_fragments[@]}" > "$out/.gitignore"
 
 "$out/scripts/setup.sh" --structure-only --tools-dir "$tools"
 ACTIONLINT_BIN="$tools/actionlint" "$out/scripts/verify.sh" --structure-only

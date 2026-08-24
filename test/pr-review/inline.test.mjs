@@ -236,30 +236,33 @@ test("finding markers round-trip through a comment body", () => {
 test("mergeFile collapses near-identical findings and credits both agents", () => {
 	const groups = mergeFile([
 		{
-			agent: "engineering",
+			agent: "boundaries",
 			rule: "Auth — public routes must opt out with @public",
 			why: "Login route lacks the @public comment.",
 		},
 		{
-			agent: "process",
+			agent: "authorization-persistence",
 			rule: "public route opt-out",
 			why: "The login route is missing its @public opt-out comment.",
 		},
 	]);
 	assert.equal(groups.length, 1);
-	assert.deepEqual([...groups[0].agents].sort(), ["engineering", "process"]);
+	assert.deepEqual([...groups[0].agents].sort(), [
+		"authorization-persistence",
+		"boundaries",
+	]);
 });
 
 test("a merged group keeps the anchor of whichever reporter could cite a line", () => {
 	const groups = mergeFile([
 		{
-			agent: "process",
+			agent: "authorization-persistence",
 			rule: "Use safe helper",
 			why: "The new caller bypasses the safe helper.",
 			file: "app/x.ts",
 		},
 		{
-			agent: "engineering",
+			agent: "boundaries",
 			rule: "Use safe helper",
 			why: "The new caller bypasses the safe helper.",
 			file: "app/x.ts",
@@ -278,7 +281,7 @@ const mkGroup = (file, rule, why) => {
 		file,
 		concept: c,
 		fp: fingerprint(file, c),
-		agents: new Set(["engineering"]),
+		agents: new Set(["boundaries"]),
 		rule,
 		why,
 	};
@@ -376,7 +379,7 @@ test("reconcile: fuzzy matching caps BOTH sides like the marker (wordy findings)
 		file: "a.ts",
 		concept: new Set(words),
 		fp: "aaaaaaaaaaaaaaaa",
-		agents: new Set(["engineering"]),
+		agents: new Set(["boundaries"]),
 		rule: "wordy",
 		why: "wordy",
 	};

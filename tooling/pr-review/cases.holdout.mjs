@@ -25,6 +25,7 @@ export const links = () => [
 	{ rel: "preload", href: "/fonts/plex-sans-400.woff2", as: "font" },
 ];`,
 		violations: [],
+		cleanFor: ["comments"],
 	},
 	{
 		id: "real-icon-set",
@@ -165,6 +166,7 @@ declare namespace Cloudflare {
 	return new ResendSender(env, from);
 }`,
 		violations: [],
+		cleanFor: ["boundaries", "contract-evolution"],
 	},
 	{
 		id: "real-resend-test",
@@ -210,7 +212,7 @@ const id = process.env.CF_D1_DATABASE_ID;`,
 export const FEATURES = [
 	{ icon: "inbox", title: "Custom call for speakers" },
 ];`,
-		violations: ["engineering"],
+		violations: ["comments"],
 	},
 
 	// ---------- authored held-out positives (surface-different; measure-only) ----------
@@ -227,6 +229,7 @@ export const FEATURES = [
 	expect(row.createdAt).toBe(1000);
 });`,
 		violations: [],
+		cleanFor: ["testing"],
 	},
 	{
 		id: "hp-weak-mock-called",
@@ -237,7 +240,7 @@ export const FEATURES = [
 	await saveContact({ insert }, { email: "x@y.com" });
 	expect(insert).toHaveBeenCalled();
 });`,
-		violations: ["engineering"],
+		violations: ["testing"],
 	},
 	{
 		id: "hp-shortcut-return-free",
@@ -247,7 +250,7 @@ export const FEATURES = [
 	// pricing isn't built yet, return free for now
 	return 0;
 }`,
-		violations: ["engineering"],
+		violations: ["contract-evolution"],
 	},
 	{
 		id: "hp-shortcut-default-on-catch",
@@ -260,7 +263,7 @@ export const FEATURES = [
 		return {};
 	}
 }`,
-		violations: ["engineering"],
+		violations: ["boundaries"],
 	},
 	{
 		id: "hp-legacy-deprecated-fn",
@@ -270,7 +273,7 @@ export const FEATURES = [
 export function fmtDate(d) {
 	return formatDate(d);
 }`,
-		violations: ["engineering"],
+		violations: ["contract-evolution"],
 	},
 
 	// ---------- more real, clean (widen the precision base) ----------
@@ -326,7 +329,7 @@ const ready = isbot(request.headers.get("user-agent")) ? "onAllReady" : "onShell
 export function total(items) {
 	return items.reduce((s, i) => s + i.price, 0);
 }`,
-		violations: ["engineering"],
+		violations: ["comments"],
 	},
 	{
 		id: "hp-bs-obvious-loop",
@@ -336,7 +339,7 @@ export function total(items) {
 	// loop over each recipient and send
 	for (const r of list) send(r);
 }`,
-		violations: ["engineering"],
+		violations: ["comments"],
 	},
 	{
 		id: "hp-weak-assert-true",
@@ -346,7 +349,7 @@ export function total(items) {
 	await boot();
 	expect(true).toBe(true);
 });`,
-		violations: ["engineering"],
+		violations: ["testing"],
 	},
 	{
 		id: "hp-weak-length-of-mock",
@@ -357,7 +360,7 @@ export function total(items) {
 	const rows = await listAll(db);
 	expect(rows.length).toBe(2);
 });`,
-		violations: ["engineering"],
+		violations: ["testing"],
 	},
 	{
 		id: "hp-shortcut-fixme-nplusone",
@@ -369,7 +372,7 @@ export async function enrich(db, ids) {
 	for (const id of ids) out.push(await db.get(id));
 	return out;
 }`,
-		violations: ["engineering"],
+		violations: ["contract-evolution", "efficiency"],
 	},
 	{
 		id: "hp-shortcut-empty-list-catch",
@@ -382,7 +385,7 @@ export async function enrich(db, ids) {
 		return [];
 	}
 }`,
-		violations: ["engineering"],
+		violations: ["boundaries"],
 	},
 	{
 		id: "hp-legacy-renamed-column",
@@ -391,7 +394,7 @@ export async function enrich(db, ids) {
 		code: `export function emailOf(row) {
 	return row.email ?? row.emailAddress;
 }`,
-		violations: ["engineering"],
+		violations: ["contract-evolution"],
 	},
 	{
 		id: "hp-legacy-compat-export",
@@ -402,6 +405,82 @@ export async function enrich(db, ids) {
 }
 // kept so older imports keep resolving
 export const getName = displayName;`,
-		violations: ["engineering"],
+		violations: ["contract-evolution"],
+	},
+	{
+		id: "hp-auth-unscoped-update",
+		source: "authored",
+		file: "app/lib/accounts.ts",
+		code: `export async function renameAccount(db, input) {
+	return db.update(accounts).set({ name: input.name }).where(eq(accounts.id, input.id));
+}`,
+		violations: ["authorization-persistence"],
+	},
+	{
+		id: "trap-auth-context-scope",
+		source: "authored",
+		file: "app/lib/accounts.ts",
+		code: `export async function renameAccount(db, user, input) {
+	return db.update(accounts).set({ name: input.name }).where(and(eq(accounts.id, input.id), eq(accounts.tenantId, user.tenantId)));
+}`,
+		violations: [],
+		cleanFor: ["authorization-persistence"],
+	},
+	{
+		id: "hp-lifecycle-no-timeout",
+		source: "authored",
+		file: "app/ports/provider.ts",
+		code: `export async function fetchProvider(url) {
+	return fetch(url);
+}`,
+		violations: ["lifecycle-capacity"],
+	},
+	{
+		id: "trap-lifecycle-deadline",
+		source: "authored",
+		file: "app/ports/provider.ts",
+		code: `export async function fetchProvider(url) {
+	return fetch(url, { signal: AbortSignal.timeout(5000) });
+}`,
+		violations: [],
+		cleanFor: ["lifecycle-capacity"],
+	},
+	{
+		id: "hp-efficiency-reparse",
+		source: "authored",
+		file: "app/lib/matcher.ts",
+		code: `export function matchesAll(pattern, values) {
+	return values.filter((value) => new RegExp(pattern).test(value));
+}`,
+		violations: ["efficiency"],
+	},
+	{
+		id: "trap-efficiency-compile-once",
+		source: "authored",
+		file: "app/lib/matcher.ts",
+		code: `export function matchesAll(pattern, values) {
+	const matcher = new RegExp(pattern);
+	return values.filter((value) => matcher.test(value));
+}`,
+		violations: [],
+		cleanFor: ["efficiency"],
+	},
+	{
+		id: "hp-dependency-without-lock",
+		source: "authored",
+		file: "Cargo.toml",
+		code: `[dependencies]
+serde = "1.0"`,
+		violations: ["dependency-integrity"],
+	},
+	{
+		id: "trap-manifest-metadata-only",
+		source: "authored",
+		file: "Cargo.toml",
+		code: `[package]
+name = "product"
+publish = false`,
+		violations: [],
+		cleanFor: ["dependency-integrity"],
 	},
 ];

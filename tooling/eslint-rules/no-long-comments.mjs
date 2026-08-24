@@ -64,7 +64,7 @@ export const noLongComments = {
 		],
 		messages: {
 			tooLong:
-				"This comment carries {{lineCount}} lines of prose; the ceiling is {{maxLines}}. Clarify the code so it needs less prose, or move the durable rationale into docs/ and link it. See docs/rules/engineering.md → Comments.",
+				"This comment carries {{lineCount}} lines of prose; the ceiling is {{maxLines}}. Clarify the code so it needs less prose, or move the durable rationale into docs/ and link it. See docs/rules/comments.md.",
 		},
 	},
 	create(context) {

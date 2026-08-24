@@ -11,9 +11,20 @@ Build production software a real user runs. Cuts come only from `SCOPE.md`. Unha
 | Topic | Read when | Where |
 |---|---|---|
 | Generator product | changing initialization or templates | `SCOPE.md` |
-| Core engineering rules | changing emitted rules | `docs/rules/` |
-| Generated language profiles | changing Rust or TypeScript output | `docs/profiles/` |
-| Reusable agent workflows | creating PRs, RCA, judge loops, or headless lanes | `.agents/skills/` |
+| Boundary modeling and failures | changing input, output, types, adapters, or errors | `docs/rules/boundaries.md` |
+| Authorization and persistence | changing a callable read, mutation, query, or stored data | `docs/rules/authorization-persistence.md` |
+| Lifecycle and capacity | changing tasks, resources, retries, queues, or previews | `docs/rules/lifecycle-capacity.md` |
+| Contract evolution | changing an API, schema, migration, or implementation path | `docs/rules/contract-evolution.md` |
+| Efficiency | changing repeated work, allocation, copying, parsing, or caching | `docs/rules/efficiency.md` |
+| Testing | writing or changing tests | `docs/rules/testing.md` |
+| Comments | adding or changing comments | `docs/rules/comments.md` |
+| Dependency integrity | changing dependencies, tools, runtimes, or pins | `docs/rules/dependency-integrity.md` |
+| Rust output | changing Rust materialization or enforcement | `template/rust/files/Cargo.toml`, `template/rust/files/scripts/verify-rust.sh` |
+| TypeScript output | changing TypeScript materialization or enforcement | `template/typescript/files/package.json`, `template/typescript/files/scripts/verify-typescript.sh` |
+| Create pull requests | preparing a pull request | `.agents/skills/create-pr/SKILL.md` |
+| Root-cause analysis | investigating a failure | `.agents/skills/root-cause/SKILL.md` |
+| Judge loops | challenging a plan or diff | `.agents/skills/judge-loop/SKILL.md` |
+| Headless lanes | delegating autonomous implementation | `.agents/skills/running-headless-lanes/SKILL.md` |
 | Generator verification | before claiming done | `VERIFICATION.md` |
 | Rule-owner review | changing reviewer behavior | `tooling/pr-review/README.md` |
 
@@ -26,3 +37,4 @@ Build production software a real user runs. Cuts come only from `SCOPE.md`. Unha
 | Initialize Rust repository | `./init.sh rust` |
 | Initialize TypeScript repository | `./init.sh typescript` |
 | Initialize mixed repository | `./init.sh rust,typescript` |
+

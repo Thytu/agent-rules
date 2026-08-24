@@ -200,6 +200,27 @@ for (const mode of ["rust", "typescript", "rust,typescript"]) {
 			}),
 			undefined,
 		);
+		const agentMap = readFileSync(join(root, "AGENTS.md"), "utf8");
+		for (const owner of [
+			"authorization-persistence",
+			"boundaries",
+			"comments",
+			"contract-evolution",
+			"dependency-integrity",
+			"efficiency",
+			"lifecycle-capacity",
+			"testing",
+		])
+			assert.match(agentMap, new RegExp(`docs/rules/${owner}\\.md`));
+		assert.equal(
+			agentMap.includes("Rust implementation"),
+			mode.includes("rust"),
+		);
+		assert.equal(
+			agentMap.includes("TypeScript implementation"),
+			mode.includes("typescript"),
+		);
+		assert.doesNotMatch(agentMap, /docs\/profiles|LANGUAGE_ROWS/);
 		const pullRequestTemplate = readFileSync(
 			join(root, ".github", "PULL_REQUEST_TEMPLATE.md"),
 			"utf8",
@@ -263,10 +284,75 @@ for (const mode of ["rust", "typescript", "rust,typescript"]) {
 				join(root, "test", "product", "view.test.tsx"),
 				'import assert from "node:assert/strict";\nimport { test } from "node:test";\ntest("tsx product test", () => {\n\tconst label: string = "ready";\n\tassert.equal(label, "ready");\n});\n',
 			);
-			execFileSync("bash", ["scripts/verify.sh"], {
+			writeFileSync(
+				join(root, "test", "product", "ignored.test.mjs"),
+				'throw new Error("unsupported test extension executed");\n',
+			);
+			const cargoPath = join(root, "Cargo.toml");
+			writeFileSync(
+				cargoPath,
+				`${readFileSync(cargoPath, "utf8").replace(
+					"members = []",
+					'members = ["crates/helper", "crates/product"]',
+				)}\n[workspace.dependencies]\nhelper = { path = "crates/helper", version = "0.1.0" }\n`,
+			);
+			for (const crate of ["helper", "product"])
+				mkdirSync(join(root, "crates", crate, "src"), { recursive: true });
+			const helperManifest = `[package]\nname = "helper"\nversion.workspace = true\nedition.workspace = true\nrust-version.workspace = true\nlicense.workspace = true\n\n[lints]\nworkspace = true\n`;
+			const productManifest = `[package]\nname = "product"\nversion.workspace = true\nedition.workspace = true\nrust-version.workspace = true\nlicense.workspace = true\n\n[lints]\nworkspace = true\n\n[dependencies]\nhelper = { workspace = true }\n`;
+			writeFileSync(
+				join(root, "crates", "helper", "Cargo.toml"),
+				helperManifest,
+			);
+			writeFileSync(
+				join(root, "crates", "helper", "src", "lib.rs"),
+				"#[must_use]\npub const fn answer() -> u32 {\n    42\n}\n",
+			);
+			const productManifestPath = join(root, "crates", "product", "Cargo.toml");
+			writeFileSync(productManifestPath, productManifest);
+			writeFileSync(
+				join(root, "crates", "product", "src", "lib.rs"),
+				"#[must_use]\npub const fn answer() -> u32 {\n    helper::answer()\n}\n",
+			);
+			execFileSync("cargo", ["+1.98.0", "generate-lockfile"], {
 				cwd: root,
 				env: process.env,
 			});
+			execFileSync("bash", ["scripts/verify.sh"], {
+				cwd: root,
+				env: process.env,
+				stdio: process.env.DEBUG_INIT === "1" ? "inherit" : undefined,
+			});
+			for (const [invalid, message] of [
+				[
+					productManifest.replace(
+						"edition.workspace = true",
+						'edition = "2024"',
+					),
+					/must inherit package\.edition/,
+				],
+				[
+					productManifest.replace("[lints]\nworkspace = true\n\n", ""),
+					/must set lints\.workspace = true/,
+				],
+				[
+					productManifest.replace(
+						"helper = { workspace = true }",
+						'helper = { path = "../helper" }',
+					),
+					/must inherit every dependencies entry/,
+				],
+			]) {
+				writeFileSync(productManifestPath, invalid);
+				const rejected = spawnSync("bash", ["scripts/verify-rust.sh"], {
+					cwd: root,
+					encoding: "utf8",
+					env: process.env,
+				});
+				assert.notEqual(rejected.status, 0);
+				assert.match(`${rejected.stdout}${rejected.stderr}`, message);
+			}
+			writeFileSync(productManifestPath, productManifest);
 		}
 	});
 }

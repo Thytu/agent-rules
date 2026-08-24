@@ -16,6 +16,7 @@ export default [
 			"dist/**",
 			"coverage/**",
 			"node_modules/**",
+			"target/**",
 			".agent-rules/**",
 		],
 	},

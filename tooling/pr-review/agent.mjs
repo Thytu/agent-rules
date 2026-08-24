@@ -499,11 +499,18 @@ export function isRetryableTransportFailure(reason) {
 
 export async function runRuleReviewer(args) {
 	const limits = { ...DEFAULT_LIMITS, ...args.limits };
+	const deadline = Date.now() + limits.timeoutMs;
 	let last;
 	for (let attempt = 0; attempt <= TRANSPORT_RETRIES; attempt++) {
+		const remainingMs = deadline - Date.now();
+		if (remainingMs <= 0) {
+			last.reason = "review timeout exceeded";
+			last.retried = attempt;
+			return last;
+		}
 		last = await runRuleReviewerSession({
 			...args,
-			limits,
+			limits: { ...limits, timeoutMs: remainingMs },
 		});
 		if (last.status === "complete") {
 			if (attempt > 0) last.retried = attempt;

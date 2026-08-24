@@ -1,7 +1,7 @@
 // An object schema carrying an enum next to a pile of optional siblings is
 // usually two or three shapes wearing one coat: the enum picks the branch, and
 // each optional belongs to only some branches, so nothing tells a caller which
-// fields it may read. See docs/rules/engineering.md → Shape at the boundary.
+// fields it may read. See docs/rules/boundaries.md.
 const MIN_OPTIONAL_SIBLINGS = 2;
 
 const ZOD_OBJECT_FACTORIES = new Set(["object", "strictObject", "looseObject"]);
@@ -137,7 +137,7 @@ export const noLooseVariantObjects = {
 		schema: [],
 		messages: {
 			looseVariant:
-				"Loose variant schema: enum field(s) {{enums}} alongside optional sibling field(s) {{optionals}}. If this value has more than one shape, model the shapes as a discriminated union (z.discriminatedUnion / Type.Union of tagged objects) so each branch names the fields it carries — an optional field should mean absent-in-this-shape, not belongs-to-another-shape. See docs/rules/engineering.md → Shape at the boundary.",
+				"Loose variant schema: enum field(s) {{enums}} alongside optional sibling field(s) {{optionals}}. If this value has more than one shape, model the shapes as a discriminated union (z.discriminatedUnion / Type.Union of tagged objects) so each branch names the fields it carries — an optional field should mean absent-in-this-shape, not belongs-to-another-shape. See docs/rules/boundaries.md.",
 		},
 	},
 	create(context) {

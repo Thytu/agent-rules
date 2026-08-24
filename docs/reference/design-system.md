@@ -1,6 +1,6 @@
 # Design system
 
-Locked skin. Implementation = tokens + primitives. Routes never make a visual decision — see [`engineering.md`](engineering.md).
+Locked skin. Implementation = tokens + primitives. Routes never make a visual decision.
 
 ## The one law
 

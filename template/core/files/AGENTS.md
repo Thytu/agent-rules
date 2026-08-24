@@ -11,9 +11,16 @@ Build production software a real user runs. Cuts come only from `SCOPE.md`. Unha
 | Topic | Read when | Where |
 |---|---|---|
 | What to build | starting any feature | `SCOPE.md` |
-| Language profiles | writing language-specific code | `docs/profiles/` |
-| House conventions | writing code or tests | `docs/rules/engineering.md` |
-| Git, ownership, and sequencing | changing shared files or workflow | `docs/rules/process.md` |
+| Boundary modeling and failures | changing input, output, types, adapters, or errors | `docs/rules/boundaries.md` |
+| Authorization and persistence | changing a callable read, mutation, query, or stored data | `docs/rules/authorization-persistence.md` |
+| Lifecycle and capacity | changing tasks, resources, retries, queues, or previews | `docs/rules/lifecycle-capacity.md` |
+| Contract evolution | changing an API, schema, migration, or implementation path | `docs/rules/contract-evolution.md` |
+| Efficiency | changing repeated work, allocation, copying, parsing, or caching | `docs/rules/efficiency.md` |
+| Testing | writing or changing tests | `docs/rules/testing.md` |
+| Comments | adding or changing comments | `docs/rules/comments.md` |
+| Dependency integrity | changing dependencies, tools, runtimes, or pins | `docs/rules/dependency-integrity.md` |
+<!-- LANGUAGE_ROWS -->
+| Shared-file ownership | changing protected repository policy | `scripts/authorize-changes.sh` |
 | How to self-verify | before claiming done | `VERIFICATION.md` |
 
 ## Commands
@@ -24,3 +31,4 @@ Build production software a real user runs. Cuts come only from `SCOPE.md`. Unha
 | Infrastructure gate | `bash scripts/verify.sh --structure-only` |
 | Full gate | `bash scripts/verify.sh` |
 | Apply GitHub settings | `bash scripts/setup-github.sh` |
+
