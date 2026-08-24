@@ -98,4 +98,4 @@ diff -qr -x .git "$out" "$root" >/dev/null
 trap - ERR INT TERM
 
 echo "init: materialized $selection successfully"
-echo "next: fill SCOPE.md, docs/rules/tech-stack.md, VERIFICATION.md, and docs/scenarios; then run bash scripts/verify.sh"
+echo "next: fill SCOPE.md, VERIFICATION.md, and docs/scenarios; then run bash scripts/verify.sh"

@@ -404,37 +404,4 @@ export async function enrich(db, ids) {
 export const getName = displayName;`,
 		violations: ["engineering"],
 	},
-
-	// ---------- cross-area positives (exercise the other agents) ----------
-	{
-		id: "plat-d1-transaction",
-		source: "authored",
-		file: "app/lib/move.ts",
-		code: `export async function moveSession(db, id, roomId) {
-	await db.transaction(async (tx) => {
-		await tx.update(sessions).set({ roomId }).where(eq(sessions.id, id));
-	});
-}`,
-		violations: ["tech-stack"],
-	},
-	{
-		id: "plat-react-router-dom",
-		source: "authored",
-		file: "app/lib/nav.ts",
-		code: `import { useNavigate } from "react-router-dom";
-export function useGoHome() {
-	const navigate = useNavigate();
-	return () => navigate("/admin");
-}`,
-		violations: ["tech-stack"],
-	},
-	{
-		id: "plat-batch-clean",
-		source: "authored",
-		file: "app/lib/provision.ts",
-		code: `export async function provision(db, rows) {
-	await db.batch(rows.map((r) => db.insert(sessions).values(r)));
-}`,
-		violations: [],
-	},
 ];

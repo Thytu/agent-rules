@@ -257,10 +257,6 @@ for (const mode of ["rust", "typescript", "rust,typescript"]) {
 				join(root, "VERIFICATION.md"),
 				"# Verification\n\nRun the product smoke at its real boundary.\n",
 			);
-			writeFileSync(
-				join(root, "docs", "rules", "tech-stack.md"),
-				"# Tech stack\n\nRust and TypeScript with exact committed locks.\n",
-			);
 			rmSync(join(root, "docs", "scenarios", "00-example.yaml"));
 			writeFileSync(
 				join(root, "docs", "scenarios", "01-product.yaml"),

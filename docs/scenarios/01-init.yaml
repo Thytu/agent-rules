@@ -17,7 +17,6 @@ touches:
     - .githooks/
     - docs/rules/engineering.md
     - docs/rules/process.md
-    - docs/rules/tech-stack.md
     - docs/profiles/rust.md
     - docs/profiles/typescript.md
     - docs/scenarios/README.md
