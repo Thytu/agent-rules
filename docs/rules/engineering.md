@@ -22,7 +22,7 @@ Queues, retained history, uploads, retries, and concurrency are bounded with exp
 
 ## No deferred or parallel implementations
 
-Do not leave TODO implementations, silent fallbacks, compatibility shims, deprecated aliases, parallel V2 paths, or code comments promising later cleanup. A scope cut is recorded in `SCOPE.md` or the gap register and the unavailable path fails explicitly.
+Do not leave TODO implementations, silent fallbacks, compatibility shims, deprecated aliases, parallel V2 paths, or code comments promising later cleanup. A scope cut is recorded in `SCOPE.md`, and the unavailable path fails explicitly.
 
 Change a contract by migrating every caller and deleting the old path in the same change. Compatibility at an uncontrolled external boundary requires an owner-approved specification.
 

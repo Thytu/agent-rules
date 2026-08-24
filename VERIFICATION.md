@@ -29,4 +29,4 @@ bash scripts/verify.sh --structure-only
 bash scripts/verify.sh
 ```
 
-The default generated gate intentionally fails until product placeholders and the untouched example scenario are replaced.
+The default generated gate intentionally fails until the product placeholders are replaced.
