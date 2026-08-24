@@ -5,14 +5,14 @@ The source reviewer runs exactly eight independent owner reviews, one per top-le
 ## Architecture
 
 - `agents.mjs` discovers and sorts the eight top-level rule documents and fails if the count differs from the declared budget. There are no profile reviewers or marker stubs.
-- `core.mjs` loads each document verbatim and configures Pi's native DeepSeek
-  provider for `deepseek-v4-flash`. `FINDING_LIMITS` bounds what reaches GitHub;
-  oversized tool arguments are clamped at submission. Requests use the model
-  catalog's explicit `maxTokens` ceiling rather than a smaller derived token
-  budget, so a valid multi-tool response is not truncated. Cost is bounded by
-  the shared 15-minute deadline, 60-turn and 200-tool ceilings, and at most
-  `SUBMISSIONS_PER_RESPONSE` recorded findings per response—not by a separate
-  `RESPONSE_CEILING`.
+- `core.mjs` loads each document verbatim and configures Pi's native OpenAI
+  Responses provider for `gpt-5.6-luna`. Requests use Flex processing. A
+  `429 resource_unavailable` response is retried once with standard processing;
+  other rate-limit, authentication, and validation failures retain their real
+  semantics. `FINDING_LIMITS` bounds what reaches GitHub, and requests use the
+  model catalog's explicit `maxTokens` ceiling so a valid multi-tool response is
+  not truncated. Cost remains bounded by the shared 15-minute deadline,
+  60-turn and 200-tool ceilings, and `SUBMISSIONS_PER_RESPONSE`.
 
 - `agent.mjs` gives each rule owner its own `@earendil-works/pi-agent-core`
   `Agent`. Its initial context is a compact changed-file index (status, path,
@@ -43,12 +43,10 @@ the review. It exists because the original contract made one terminal JSON carry
 every finding, so a reviewer with a lot to say about a large diff was cut off
 mid-answer and its whole review was discarded.
 
-The truncation that forced this was our own bug, not a provider limit. pi-ai sends
-`max_completion_tokens` for OpenAI-compatible providers outside its allow-list,
-DeepSeek is outside it, and DeepSeek's API reads only `max_tokens` — so every
-ceiling we sent was dropped and DeepSeek's 8192 default stood in for it.
-Requesting 6214 and still stopping at 8192 is what exposed it. The runtime now
-names the field DeepSeek reads and asks for the catalog's own ceiling.
+The runtime asks for the selected model catalog's output ceiling. Provider
+defaults had previously truncated valid multi-tool responses even though the
+review contract allowed more findings; the explicit ceiling keeps the transport
+and finding budgets aligned.
 
 Every request sets `toolChoice: "required"`, so a response can only be tool calls.
 Incremental submission alone did not fix the overflow — reviewers still spent whole
@@ -176,7 +174,7 @@ anchored finding.
   best-effort GraphQL thread resolution only after a complete review. Bot-resolved
   findings that reappear post fresh.
 
-The GitHub Actions job uses base-owned `pull_request_target` code. It checks out the exact base SHA, fetches `refs/pull/<number>/head` as an object without checking it out, verifies the event head SHA, and exposes head content only through bounded read-only repository tools. Candidate workflow/code never receives the DeepSeek secret or write token; validated output can post advisory review comments only.
+The GitHub Actions job uses base-owned `pull_request_target` code. It checks out the exact base SHA, fetches `refs/pull/<number>/head` as an object without checking it out, verifies the event head SHA, and exposes head content only through bounded read-only repository tools. Candidate workflow/code never receives the OpenAI secret or write token; validated output can post advisory review comments only.
 
 ## Verification
 
@@ -194,10 +192,10 @@ enforcement, incremental submission, completion signaling, anchoring,
 fingerprints, dedupe, reconciliation, stale deferral, and posting payloads. CI
 runs this complete network-free set in its unconditional quality job.
 
-A local production dry run performs real DeepSeek sessions but no GitHub writes:
+A local production dry run performs real GPT-5.6 Luna sessions but no GitHub writes:
 
 ```bash
-DEEPSEEK_API_KEY=... DRY_RUN=1 \
+OPENAI_API_KEY=... DRY_RUN=1 \
   BASE_SHA=<base> HEAD_SHA=<head> node tooling/pr-review/ci-review.mjs
 ```
 
@@ -212,10 +210,13 @@ owner gets its own session, and any incomplete session aborts the run rather tha
 being scored as a clean prediction.
 
 ```bash
-DEEPSEEK_API_KEY=... DEEPSEEK_MODEL=deepseek-v4-flash \
+OPENAI_API_KEY=... OPENAI_MODEL=gpt-5.6-luna \
   RUNS=5 node tooling/pr-review/review.mjs holdout
-DEEPSEEK_API_KEY=... node tooling/pr-review/review.mjs dev
+OPENAI_API_KEY=... node tooling/pr-review/review.mjs dev
 ```
+
+Flex is the default. Set `OPENAI_SERVICE_TIER=default` to request standard
+processing from the start; Flex resource exhaustion falls back automatically.
 
 The evaluator prints micro and per-owner precision, recall, and F1. Development
 cases are available while tuning; holdout cases remain separate to expose

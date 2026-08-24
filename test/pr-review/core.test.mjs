@@ -1,49 +1,119 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
+	createFlexFallbackFetch,
+	DEFAULT_MODEL,
 	FINDING_LIMITS,
 	makeRuntime,
 	streamOptions,
 	SUBMISSIONS_PER_RESPONSE,
 } from "../../tooling/pr-review/core.mjs";
 
-// The contract: reviewer sessions must reach DeepSeek through Pi's own DeepSeek
-// provider, so the wire format, compat quirks, and tool support come from Pi's
-// catalog rather than from anything we hand-assemble here.
-test("the runtime carries Pi's DeepSeek provider contract, not a hand-built model", () => {
+test("the runtime uses Pi's native GPT-5.6 Luna Responses contract", () => {
 	const runtime = makeRuntime({
 		key: "test-key",
-		base: "https://api.deepseek.test",
-		model: "deepseek-v4-flash",
+		base: "https://api.openai.test/v1",
+		model: DEFAULT_MODEL,
 		temperature: 0,
 	});
 
-	assert.equal(runtime.model.provider, "deepseek");
-	assert.equal(runtime.model.api, "openai-completions");
-	assert.equal(runtime.model.compat?.supportsDeveloperRole, false);
-	assert.equal(runtime.model.compat?.thinkingFormat, "deepseek");
-	assert.ok(runtime.model.contextWindow > 0);
-	assert.ok(runtime.model.maxTokens > 100_000);
+	assert.equal(runtime.model.id, "gpt-5.6-luna");
+	assert.equal(runtime.model.provider, "openai");
+	assert.equal(runtime.model.api, "openai-responses");
+	assert.equal(runtime.model.reasoning, true);
+	assert.equal(runtime.model.thinkingLevelMap?.off, "none");
+	assert.equal(runtime.model.maxTokens, 128_000);
+	assert.equal(runtime.serviceTier, "flex");
 });
 
-// This is the defect that cost a night of reviews. pi-ai chooses
-// max_completion_tokens for every OpenAI-compatible provider outside its
-// allow-list, DeepSeek is outside it, and DeepSeek's API reads only max_tokens —
-// so every ceiling we sent was dropped on the floor and its 8192 default applied.
-// Requesting 6214 still stopped at 8192, which is what gave it away.
-test("the output ceiling is sent under the field name DeepSeek reads", () => {
-	const runtime = makeRuntime({
+test("stream options request Flex processing and required tools", () => {
+	const sent = streamOptions({
 		key: "test-key",
-		base: "https://api.deepseek.test",
-		model: "deepseek-v4-flash",
-		temperature: 0,
+		model: { maxTokens: 128_000 },
+		serviceTier: "flex",
+		options: { toolChoice: "required" },
 	});
 
-	assert.equal(
-		runtime.model.compat?.maxTokensField,
-		"max_tokens",
-		"DeepSeek ignores max_completion_tokens, so a ceiling sent under it never arrives",
+	assert.equal(sent.serviceTier, "flex");
+	assert.equal(sent.toolChoice, "required");
+});
+
+test("runtime preserves Flex and tool requirements through Pi", async () => {
+	let payload;
+	const runtime = makeRuntime({
+		key: "test-key",
+		fetchFn: async (_input, init) => {
+			payload = JSON.parse(init.body);
+			return new Response(
+				JSON.stringify({ error: { message: "stop after capture" } }),
+				{ status: 400, headers: { "content-type": "application/json" } },
+			);
+		},
+	});
+	const stream = runtime.streamFn(
+		runtime.model,
+		{ systemPrompt: "review", messages: [], tools: [] },
+		{ toolChoice: "required" },
 	);
+	await stream.result();
+
+	assert.equal(payload.model, DEFAULT_MODEL);
+	assert.equal(payload.service_tier, "flex");
+	assert.equal(payload.tool_choice, "required");
+});
+
+test("Flex resource exhaustion retries once with standard processing", async () => {
+	const tiers = [];
+	const fetchWithFallback = createFlexFallbackFetch(async (_input, init) => {
+		const { service_tier: tier } = JSON.parse(init.body);
+		tiers.push(tier);
+		if (tier === "flex")
+			return new Response(
+				JSON.stringify({
+					error: {
+						code: "resource_unavailable",
+						message: "Resource unavailable for Flex processing",
+					},
+				}),
+				{ status: 429, headers: { "content-type": "application/json" } },
+			);
+		return new Response("{}", { status: 200 });
+	});
+
+	const response = await fetchWithFallback(
+		"https://api.openai.test/responses",
+		{
+			method: "POST",
+			body: JSON.stringify({ model: DEFAULT_MODEL, service_tier: "flex" }),
+		},
+	);
+
+	assert.equal(response.status, 200);
+	assert.deepEqual(tiers, ["flex", "default"]);
+});
+
+test("ordinary rate limits do not switch a Flex request to standard", async () => {
+	let calls = 0;
+	const fetchWithFallback = createFlexFallbackFetch(async () => {
+		calls++;
+		return new Response(
+			JSON.stringify({
+				error: { code: "rate_limit_exceeded", message: "Too many requests" },
+			}),
+			{ status: 429, headers: { "content-type": "application/json" } },
+		);
+	});
+
+	const response = await fetchWithFallback(
+		"https://api.openai.test/responses",
+		{
+			method: "POST",
+			body: JSON.stringify({ model: DEFAULT_MODEL, service_tier: "flex" }),
+		},
+	);
+
+	assert.equal(response.status, 429);
+	assert.equal(calls, 1);
 });
 
 // Asking for less than the model allows is asking reviewers to truncate for a
@@ -82,8 +152,8 @@ test("the requested ceiling holds a full response of maximum-size findings", () 
 	);
 	const runtime = makeRuntime({
 		key: "test-key",
-		base: "https://api.deepseek.test",
-		model: "deepseek-v4-flash",
+		base: "https://api.openai.test/v1",
+		model: DEFAULT_MODEL,
 		temperature: 0,
 	});
 	const ceiling = streamOptions({

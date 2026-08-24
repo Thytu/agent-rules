@@ -217,9 +217,8 @@ test("Pi keeps one session across model-selected changed and unchanged reads", a
 	assert.equal(result.findings[0].agent, "boundaries");
 });
 
-// The overflow this contract lost to was prose: DeepSeek caps a completion at
-// 8192 output tokens whatever ceiling is requested, and one reviewer spent a
-// whole response on commentary by its fifth turn without reaching a finding.
+// The overflow this contract prevents was prose: one reviewer spent a whole
+// response on commentary by its fifth turn without reaching a finding.
 // Instructions did not stop it, so the request leaves it no other channel.
 test("every request forces the response to be tool calls", async () => {
 	const choices = [];

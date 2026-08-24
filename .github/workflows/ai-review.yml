@@ -16,9 +16,9 @@ jobs:
       - name: Check configuration
         id: configured
         env:
-          DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
         run: |
-          if test -n "$DEEPSEEK_API_KEY"; then echo 'enabled=true' >> "$GITHUB_OUTPUT"; else echo 'enabled=false' >> "$GITHUB_OUTPUT"; fi
+          if test -n "$OPENAI_API_KEY"; then echo 'enabled=true' >> "$GITHUB_OUTPUT"; else echo 'enabled=false' >> "$GITHUB_OUTPUT"; fi
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         if: steps.configured.outputs.enabled == 'true'
         with:
@@ -52,7 +52,7 @@ jobs:
       - name: Review exact PR objects with base-owned code
         if: steps.configured.outputs.enabled == 'true'
         env:
-          DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           GH_TOKEN: ${{ github.token }}
           REPO: ${{ github.repository }}
           PR_NUMBER: ${{ github.event.pull_request.number }}

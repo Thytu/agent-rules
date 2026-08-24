@@ -146,6 +146,8 @@ test("trusted workflows isolate guard, quality, and AI review", () => {
 	assert.match(quality, /\n\s{2}pull_request:\n/);
 	assert.doesNotMatch(quality, /secrets\./);
 	assert.match(review, /pull_request_target:/);
+	assert.match(review, /secrets\.OPENAI_API_KEY/);
+	assert.doesNotMatch(review, /DEEPSEEK_API_KEY/);
 	for (const workflow of [quality, review]) {
 		assert.ok(
 			workflow.indexOf("pnpm/action-setup@") <

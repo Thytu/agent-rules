@@ -3,8 +3,13 @@
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { createModels } from "@earendil-works/pi-ai";
-import { deepseekProvider } from "@earendil-works/pi-ai/providers/deepseek";
+import { openaiProvider } from "@earendil-works/pi-ai/providers/openai";
 import { loadAgents, REPO_ROOT } from "./agents.mjs";
+
+export const DEFAULT_BASE_URL = "https://api.openai.com/v1";
+export const DEFAULT_MODEL = "gpt-5.6-luna";
+export const DEFAULT_SERVICE_TIER = "flex";
+const STANDARD_SERVICE_TIER = "default";
 
 // Per-field ceilings for one finding. The prompt states these numbers and the
 // submit_finding boundary enforces them, so a reviewer is never told one contract
@@ -17,10 +22,9 @@ export const FINDING_LIMITS = { quote: 240, rule: 100, why: 240 };
 // cap, the extra submissions are refused with a reason and re-issued next turn.
 export const SUBMISSIONS_PER_RESPONSE = 10;
 
-// The catalog's own output ceiling, not a number invented here. The 8192 that
-// looked like a provider limit was our own bug: pi-ai sends max_completion_tokens
-// for DeepSeek, DeepSeek's API only reads max_tokens, so the value never arrived
-// and its 8192 default applied — asking for 6214 still stopped at 8192.
+// Use the catalog's own output ceiling. A smaller local guess can truncate a
+// valid response containing the full per-response finding allowance.
+
 export function requestCeiling(model) {
 	return model?.maxTokens;
 }
@@ -65,40 +69,95 @@ export async function loadSystems() {
 
 const REQ_TIMEOUT_MS = Number(process.env.REQ_TIMEOUT_MS ?? 60000);
 
+async function isFlexResourceUnavailable(response) {
+	if (response.status !== 429) return false;
+	try {
+		const payload = await response.clone().json();
+		const error = payload?.error ?? {};
+		return (
+			error.code === "resource_unavailable" ||
+			/resource unavailable/i.test(String(error.message ?? ""))
+		);
+	} catch {
+		return false;
+	}
+}
+
+// OpenAI documents 429 resource_unavailable as Flex capacity exhaustion and
+// recommends retrying the same request with standard processing. Other 429s
+// remain rate-limit failures; authentication and validation failures never
+// change tier.
+export function createFlexFallbackFetch(fetchFn = globalThis.fetch) {
+	return async (input, init) => {
+		const response = await fetchFn(input, init);
+		if (!(await isFlexResourceUnavailable(response))) return response;
+		if (typeof init?.body !== "string") return response;
+
+		try {
+			const payload = JSON.parse(init.body);
+			if (payload.service_tier !== "flex") return response;
+			return fetchFn(input, {
+				...init,
+				body: JSON.stringify({
+					...payload,
+					service_tier: STANDARD_SERVICE_TIER,
+				}),
+			});
+		} catch {
+			return response;
+		}
+	};
+}
+
 // Pi forwards a max-output value only when maxTokens is set; with none, the
-// provider's own default truncates a reviewer mid-response.
-export function streamOptions({ key, temperature, model, options = {} }) {
+// provider's own default can truncate a reviewer mid-response.
+export function streamOptions({
+	key,
+	temperature,
+	model,
+	serviceTier,
+	fetchFn,
+	options = {},
+}) {
 	return {
 		...options,
 		apiKey: key,
 		temperature,
 		maxTokens: options.maxTokens ?? requestCeiling(model),
+		...(serviceTier ? { serviceTier: options.serviceTier ?? serviceTier } : {}),
+		...(fetchFn ? { fetch: options.fetch ?? fetchFn } : {}),
 		timeoutMs: REQ_TIMEOUT_MS,
 		maxRetries: 3,
 	};
 }
 
-export function makeRuntime({ key, base, model, temperature }) {
+export function makeRuntime({
+	key,
+	base = DEFAULT_BASE_URL,
+	model = DEFAULT_MODEL,
+	temperature,
+	serviceTier = DEFAULT_SERVICE_TIER,
+	fetchFn = globalThis.fetch,
+}) {
+	if (!["flex", "auto", "default"].includes(serviceTier))
+		throw new Error(`Unsupported OpenAI service tier: ${serviceTier}`);
+
 	const models = createModels();
-	models.setProvider(deepseekProvider());
-	const catalogModel = models.getModel("deepseek", model);
-	const template =
-		catalogModel ?? models.getModel("deepseek", "deepseek-v4-flash");
-	if (!template) throw new Error(`DeepSeek model is unavailable: ${model}`);
+	models.setProvider(openaiProvider());
+	const catalogModel = models.getModel("openai", model);
+	const template = catalogModel ?? models.getModel("openai", DEFAULT_MODEL);
+	if (!template) throw new Error(`OpenAI model is unavailable: ${model}`);
 	const activeModel = {
 		...template,
 		id: model,
 		name: catalogModel?.name ?? model,
 		baseUrl: base,
-		// pi-ai picks max_completion_tokens for every OpenAI-compatible provider
-		// not on its allow-list, and DeepSeek is not on it. DeepSeek's API reads
-		// max_tokens only, so the ceiling silently never arrived and its 8192
-		// default stood in for it. Name the field DeepSeek actually reads.
-		compat: { ...template.compat, maxTokensField: "max_tokens" },
 	};
+	const requestFetch =
+		serviceTier === "flex" ? createFlexFallbackFetch(fetchFn) : fetchFn;
 
 	async function api(path, init) {
-		const response = await fetch(`${base}${path}`, {
+		const response = await fetchFn(`${base}${path}`, {
 			signal: AbortSignal.timeout(REQ_TIMEOUT_MS),
 			...init,
 			headers: {
@@ -116,16 +175,23 @@ export function makeRuntime({ key, base, model, temperature }) {
 
 	return {
 		model: activeModel,
+		serviceTier,
 		api,
 		streamFn(selectedModel, context, options = {}) {
-			return models.streamSimple(
+			const { reasoning, ...providerOptions } = options;
+			return models.stream(
 				selectedModel,
 				context,
 				streamOptions({
 					key,
 					temperature,
 					model: selectedModel ?? activeModel,
-					options,
+					serviceTier,
+					fetchFn: requestFetch,
+					options: {
+						...providerOptions,
+						...(reasoning ? { reasoningEffort: reasoning } : {}),
+					},
 				}),
 			);
 		},

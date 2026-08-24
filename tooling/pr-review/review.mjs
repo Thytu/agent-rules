@@ -2,22 +2,33 @@
 // as a one-file pull request, and every dynamically discovered rule owner reviews
 // it through the same Pi agent harness used by ci-review.mjs.
 //
-//   DEEPSEEK_API_KEY=... node review.mjs [dev|holdout]   RUNS=5 to average
-//   DEEPSEEK_API_KEY=... node review.mjs models
+//   OPENAI_API_KEY=... node review.mjs [dev|holdout]   RUNS=5 to average
+//   OPENAI_API_KEY=... node review.mjs models
 import { runRuleReviewer } from "./agent.mjs";
-import { loadSystems, makeRuntime, pool } from "./core.mjs";
+import {
+	DEFAULT_BASE_URL,
+	DEFAULT_MODEL,
+	DEFAULT_SERVICE_TIER,
+	loadSystems,
+	makeRuntime,
+	pool,
+} from "./core.mjs";
 
-const KEY = process.env.DEEPSEEK_API_KEY;
-const BASE = process.env.DEEPSEEK_BASE_URL || "https://api.deepseek.com";
-const MODEL = process.env.DEEPSEEK_MODEL || "deepseek-v4-flash";
-const TEMPERATURE = Number(process.env.TEMPERATURE ?? 0);
+const KEY = process.env.OPENAI_API_KEY;
+const BASE = process.env.OPENAI_BASE_URL || DEFAULT_BASE_URL;
+const MODEL = process.env.OPENAI_MODEL || DEFAULT_MODEL;
+const SERVICE_TIER = process.env.OPENAI_SERVICE_TIER || DEFAULT_SERVICE_TIER;
+const TEMPERATURE =
+	process.env.TEMPERATURE === undefined
+		? undefined
+		: Number(process.env.TEMPERATURE);
 const CONC = Number(process.env.CONC ?? 8);
 const RUNS = Number(process.env.RUNS ?? 1);
 
 const expectedAgents = (testCase) => new Set(testCase.violations ?? []);
 
 if (!KEY) {
-	console.error("DEEPSEEK_API_KEY is not set.");
+	console.error("OPENAI_API_KEY is not set.");
 	process.exit(1);
 }
 
@@ -26,6 +37,7 @@ const runtime = makeRuntime({
 	base: BASE,
 	model: MODEL,
 	temperature: TEMPERATURE,
+	serviceTier: SERVICE_TIER,
 });
 
 if (process.argv[2] === "models") {

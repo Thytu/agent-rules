@@ -234,8 +234,9 @@ export function fingerprint(file, conceptSet) {
 // ---------------------------------------------------------------------------
 
 // Every posted finding embeds a marker (fingerprint + file + capped concept
-// words) so a re-run recognizes its own comments after wording wobbles.
-// concept() words are [a-z0-9/.]+ — safe inside an HTML comment.
+// words) so a re-run recognizes its own comments after wording wobbles. These
+// protocol strings stay stable across model migrations so existing threads
+// continue to reconcile. concept() words are [a-z0-9/.]+ and safe here.
 export const SUMMARY_MARKER = "<!-- deepseek-review -->";
 export const RESOLVED_MARKER = "<!-- deepseek-resolved -->";
 const FINDING_RE =
@@ -324,7 +325,7 @@ export function findingCommentBody(g, { withLocation = false } = {}) {
 	return (
 		`${buildFindingMarker(g.fp, g.file, g.concept)}\n` +
 		`🤖 ${findingLine(g)}${loc}\n\n` +
-		`<sub>Advisory — DeepSeek review against \`docs/rules/\`; resolve or dismiss as you see fit.</sub>`
+		`<sub>Advisory — GPT-5.6 Luna review against \`docs/rules/\`; resolve or dismiss as you see fit.</sub>`
 	);
 }
 

@@ -336,11 +336,10 @@ async function runRuleReviewerSession({
 			thinkingLevel: "off",
 			tools: [...createRepositoryTools(repository), sink.tool, terminal.tool],
 		},
-		// Every response must be a tool call. Prose was the overflow: one reviewer
-		// spent an 8192-token response — the provider's hard cap, whatever ceiling
-		// is requested — on commentary by its fifth turn and never reached a
-		// finding. Asking for tool calls only did not stop it; having no other
-		// channel does.
+		// Every response must be a tool call. A prior provider migration exposed the
+		// failure mode: one reviewer spent an entire response on commentary by its
+		// fifth turn and never reached a finding. Asking for tool calls did not stop
+		// it; having no other response channel does.
 		streamFn: (model, context, options = {}) =>
 			runtime.streamFn(model, context, { ...options, toolChoice: "required" }),
 		toolExecution: "parallel",
