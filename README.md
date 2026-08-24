@@ -6,6 +6,8 @@ One-shot rules and tooling materializer for new repositories.
 
 Create a repository from this GitHub template, then run exactly one command before adding files:
 
+The source repository also carries auto-discovered workflows under `.agents/skills/`; they remain source-only and are removed by materialization.
+
 ```bash
 ./init.sh rust
 ./init.sh typescript

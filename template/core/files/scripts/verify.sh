@@ -17,7 +17,7 @@ check_map() {
 	[ "$(readlink "$root/CLAUDE.md" || true)" = AGENTS.md ] || fail "CLAUDE.md must be a symlink to AGENTS.md"
 	while IFS= read -r path; do
 		[ -e "$root/$path" ] || fail "AGENTS.md maps missing path $path"
-	done < <(grep -oE '`(docs/[A-Za-z0-9._/-]+|[A-Z][A-Z-]+\.md|scripts/[A-Za-z0-9._/-]+|tooling/[A-Za-z0-9._/-]+)`' "$map" | tr -d '\`' | sort -u)
+	done < <(grep -oE '`(docs/[A-Za-z0-9._/-]+|[A-Z][A-Z-]+\.md|scripts/[A-Za-z0-9._/-]+|tooling/[A-Za-z0-9._/-]+|\.agents/[A-Za-z0-9._/-]+)`' "$map" | tr -d '\`' | sort -u)
 	while IFS= read -r path; do fail "nested agent entry ${path#$root/}"; done < <(find "$root" -type f \( -name AGENTS.md -o -name CLAUDE.md \) ! -path "$root/AGENTS.md" ! -path "$root/CLAUDE.md" ! -path "$root/template/*" ! -path '*/node_modules/*' ! -path '*/.git/*')
 }
 
@@ -31,8 +31,7 @@ check_workflows() {
 }
 
 if [ "$mode" = source ]; then
-	for path in AGENTS.md CLAUDE.md SCOPE.md VERIFICATION.md README.md init.sh package.json pnpm-lock.yaml docs/rules docs/profiles docs/scenarios/01-init.yaml template/core/files/scripts/verify.sh template/rust/files template/typescript/files test/generator tooling/pr-review .github/workflows/ci.yml .github/workflows/guard.yml .github/workflows/ai-review.yml; do require "$path"; done
-	[ ! -e "$root/lefthook.yml" ] || fail "Lefthook must be removed"
+	for path in AGENTS.md CLAUDE.md SCOPE.md VERIFICATION.md README.md init.sh package.json pnpm-lock.yaml .agents/skills docs/rules docs/profiles docs/scenarios/01-init.yaml template/core/files/scripts/verify.sh template/rust/files template/typescript/files test/generator tooling/pr-review .github/workflows/ci.yml .github/workflows/guard.yml .github/workflows/ai-review.yml; do require "$path"; done
 	[ ! -e "$root/scripts/check-map.sh" ] || fail "legacy check-map.sh must be removed"
 	check_map "$root/AGENTS.md"
 	check_workflows
@@ -40,7 +39,7 @@ if [ "$mode" = source ]; then
 fi
 
 for path in AGENTS.md CLAUDE.md README.md SCOPE.md VERIFICATION.md docs/rules docs/profiles docs/scenarios .githooks .github/workflows/ci.yml .github/workflows/guard.yml .agent-rules/guarded-paths/core.txt scripts/setup.sh scripts/setup-github.sh scripts/verify.sh scripts/authorize-changes.sh scripts/guard-shared.sh scripts/guard-append-only.sh scripts/commit-msg.sh; do require "$path"; done
-for forbidden in init.sh template tooling/pr-review test/generator scripts/setup-source.sh; do [ ! -e "$root/$forbidden" ] || fail "generator path survived: $forbidden"; done
+for forbidden in init.sh template tooling/pr-review test/generator scripts/setup-source.sh .agents .claude; do [ ! -e "$root/$forbidden" ] || fail "generator path survived: $forbidden"; done
 check_map "$root/AGENTS.md"
 check_workflows
 [ -x "$root/.githooks/pre-commit" ] || fail "pre-commit hook is not executable"
