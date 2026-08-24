@@ -540,14 +540,19 @@ test("a dropped stream is retried once and can still complete", async () => {
 	assert.equal(faux.state.callCount, 2);
 });
 
-test("a transport retry preserves findings banked before the drop", async () => {
+test("a transport retry preserves and deduplicates banked findings", async () => {
+	const repeated = {
+		...violation(0),
+		why: "Rephrased explanation of the same evidence and rule.",
+	};
 	const { runtime, faux } = fauxRuntime([
 		submits([violation(0)], "before-drop"),
 		fauxAssistantMessage("", {
 			stopReason: "error",
 			errorMessage: "terminated",
 		}),
-		done(0),
+		submits([repeated], "after-drop"),
+		done(1),
 	]);
 
 	const result = await runRuleReviewer({
@@ -561,7 +566,7 @@ test("a transport retry preserves findings banked before the drop", async () => 
 	assert.equal(result.retried, 1);
 	assert.equal(result.findings.length, 1);
 	assert.equal(result.findings[0].quote, "unsafeCall(0)");
-	assert.equal(faux.state.callCount, 3);
+	assert.equal(faux.state.callCount, 4);
 });
 
 test("a transport retry shares the original wall-clock deadline", async () => {

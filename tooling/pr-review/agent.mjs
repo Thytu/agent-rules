@@ -505,13 +505,7 @@ export async function runRuleReviewer(args) {
 	const totals = { turns: 0, toolCalls: 0, reasked: 0, forced: false };
 	const combine = (result) => {
 		for (const finding of result.findings) {
-			const key = JSON.stringify([
-				finding.file,
-				finding.line,
-				finding.quote,
-				finding.rule,
-				finding.why,
-			]);
+			const key = submissionKey(finding);
 			if (!seen.has(key)) {
 				seen.add(key);
 				findings.push(finding);
