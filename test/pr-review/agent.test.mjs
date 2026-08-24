@@ -540,6 +540,30 @@ test("a dropped stream is retried once and can still complete", async () => {
 	assert.equal(faux.state.callCount, 2);
 });
 
+test("a transport retry preserves findings banked before the drop", async () => {
+	const { runtime, faux } = fauxRuntime([
+		submits([violation(0)], "before-drop"),
+		fauxAssistantMessage("", {
+			stopReason: "error",
+			errorMessage: "terminated",
+		}),
+		done(0),
+	]);
+
+	const result = await runRuleReviewer({
+		agent: BOUNDARIES,
+		system: "SYSTEM RULE",
+		repository: repository(THREE_FILES),
+		runtime,
+	});
+
+	assert.equal(result.status, "complete", result.reason);
+	assert.equal(result.retried, 1);
+	assert.equal(result.findings.length, 1);
+	assert.equal(result.findings[0].quote, "unsafeCall(0)");
+	assert.equal(faux.state.callCount, 3);
+});
+
 test("a transport retry shares the original wall-clock deadline", async () => {
 	const { runtime, faux } = fauxRuntime([
 		async () => {
@@ -567,6 +591,22 @@ test("a transport retry shares the original wall-clock deadline", async () => {
 	assert.match(result.reason, /timeout/i);
 	assert.equal(result.retried, 1);
 	assert.equal(faux.state.callCount, 2);
+});
+
+test("a zero wall-clock budget returns an explicit timeout", async () => {
+	const { runtime, faux } = fauxRuntime([done(0)]);
+	const result = await runRuleReviewer({
+		agent: BOUNDARIES,
+		system: "SYSTEM RULE",
+		repository: repository(THREE_FILES),
+		runtime,
+		limits: { timeoutMs: 0 },
+	});
+
+	assert.equal(result.status, "incomplete");
+	assert.match(result.reason, /timeout/i);
+	assert.equal(result.findings.length, 0);
+	assert.equal(faux.state.callCount, 0);
 });
 
 test("a second dropped stream stays incomplete", async () => {

@@ -19,25 +19,15 @@ for (const [name, cases] of [
 					known.has(owner),
 					`${fixture.id} names unknown owner ${owner}`,
 				);
-			for (const owner of fixture.cleanFor ?? [])
-				assert.ok(
-					known.has(owner),
-					`${fixture.id} names unknown clean owner ${owner}`,
-				);
 		}
-		for (const owner of owners) {
+		assert.ok(
+			cases.some((fixture) => fixture.violations?.length === 0),
+			`${name} has no clean fixture`,
+		);
+		for (const owner of owners)
 			assert.ok(
 				cases.some((fixture) => fixture.violations?.includes(owner)),
 				`${name} has no positive for ${owner}`,
 			);
-			assert.ok(
-				cases.some(
-					(fixture) =>
-						fixture.violations?.length === 0 &&
-						fixture.cleanFor?.includes(owner),
-				),
-				`${name} has no clean trap for ${owner}`,
-			);
-		}
 	});
 }

@@ -21,6 +21,7 @@ Build production software a real user runs. Cuts come only from `SCOPE.md`. Unha
 | Dependency integrity | changing dependencies, tools, runtimes, or pins | `docs/rules/dependency-integrity.md` |
 <!-- LANGUAGE_ROWS -->
 | Shared-file ownership | changing protected repository policy | `scripts/authorize-changes.sh` |
+| Repository workflow | before committing, synchronizing, or preparing a pull request | `README.md` |
 | How to self-verify | before claiming done | `VERIFICATION.md` |
 
 ## Commands

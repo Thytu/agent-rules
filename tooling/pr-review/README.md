@@ -1,6 +1,6 @@
 # PR review — autonomous rule owners
 
-The source reviewer runs exactly eight independent DeepSeek sessions, one per top-level `docs/rules/*.md` owner. Each session owns the whole pull request under its assigned document and decides what repository evidence to inspect. Generated repositories receive the rule documents as coding guidance but no reviewer runtime or workflow.
+The source reviewer runs exactly eight independent owner reviews, one per top-level `docs/rules/*.md` owner. Each owns the whole pull request under its assigned document. A retryable transport drop may open one fresh provider session, but it keeps the owner’s original deadline, tool budget, and already-proven findings. Generated repositories receive the rule documents as coding guidance but no reviewer runtime or workflow.
 
 ## Architecture
 
@@ -28,7 +28,7 @@ The source reviewer runs exactly eight independent DeepSeek sessions, one per to
 - `ci-review.mjs` launches the rule-owner sessions in parallel and passes their
   findings into the existing deterministic posting pipeline in `inline.mjs`.
 
-The reviewer creates eight top-level whole-PR sessions, never one model request per changed file. All eight run in one parallel wave. A ninth document fails before model use until the owner and cost contract is changed explicitly.
+The reviewer creates eight top-level whole-PR owner reviews, never one review per changed file. All eight run in one parallel wave. A ninth document fails before model use until the owner and cost contract is changed explicitly.
 
 The launcher does not rank files, create clusters, prescribe traversal order, or
 encode a delegation workflow. Its only orchestration is independent rule-owner
@@ -221,4 +221,4 @@ The evaluator prints micro and per-owner precision, recall, and F1. Development
 cases are available while tuning; holdout cases remain separate to expose
 overfitting. Results are a baseline only when every owner completes.
 
-The committed corpus has 36 development and 43 holdout fixtures. With eight owners, one run costs 288 and 344 sessions respectively, or 632 sessions for both.
+The committed corpus has 36 development and 43 holdout fixtures. With eight owners, one run performs 288 and 344 owner evaluations respectively, or 632 for both. A retryable transport drop can add at most one provider session to an owner evaluation without resetting its limits.

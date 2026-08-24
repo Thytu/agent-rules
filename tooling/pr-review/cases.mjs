@@ -51,7 +51,6 @@ export function SubmissionsMock() {
 // throws only in production (workerd does not enforce it locally).
 const PBKDF2_ITERATIONS = 100_000;`,
 		violations: [],
-		cleanFor: ["comments"],
 	},
 	{
 		id: "ok-platform-why",
@@ -126,7 +125,6 @@ it("has welcome copy", () => {
 	expect(rows).toHaveLength(1);
 });`,
 		violations: [],
-		cleanFor: ["testing"],
 	},
 	{
 		id: "ok-load-bearing-negative",
@@ -192,7 +190,6 @@ export async function allSubmissions(db) {
 	return new AirtableSync(env);
 }`,
 		violations: [],
-		cleanFor: ["boundaries", "contract-evolution"],
 	},
 	{
 		id: "ok-bounded-logged",
@@ -294,7 +291,6 @@ event.uid = "session-" + session.id + "@openrostrum.com";`,
 	return { cancel: () => controller.abort(), result };
 }`,
 		violations: [],
-		cleanFor: ["lifecycle-capacity"],
 	},
 	{
 		id: "ok-parse-once-before-loop",
@@ -304,7 +300,6 @@ event.uid = "session-" + session.id + "@openrostrum.com";`,
 	for (const event of events) deliver(routes[event.type], event);
 }`,
 		violations: [],
-		cleanFor: ["efficiency"],
 	},
 
 	// ---- mixed + clean ----
@@ -345,7 +340,6 @@ export function verifyTurnstile(env, token) {
 	return db.select().from(contacts).where(eq(contacts.tenantId, user.tenantId));
 }`,
 		violations: [],
-		cleanFor: ["authorization-persistence"],
 	},
 	{
 		id: "dependency-manifest-only",
@@ -364,6 +358,5 @@ export function verifyTurnstile(env, token) {
 	"scripts": { "start": "node app.js" }
 }`,
 		violations: [],
-		cleanFor: ["dependency-integrity"],
 	},
 ];

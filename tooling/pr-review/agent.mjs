@@ -500,18 +500,70 @@ export function isRetryableTransportFailure(reason) {
 export async function runRuleReviewer(args) {
 	const limits = { ...DEFAULT_LIMITS, ...args.limits };
 	const deadline = Date.now() + limits.timeoutMs;
+	const findings = [];
+	const seen = new Set();
+	const totals = { turns: 0, toolCalls: 0, reasked: 0, forced: false };
+	const combine = (result) => {
+		for (const finding of result.findings) {
+			const key = JSON.stringify([
+				finding.file,
+				finding.line,
+				finding.quote,
+				finding.rule,
+				finding.why,
+			]);
+			if (!seen.has(key)) {
+				seen.add(key);
+				findings.push(finding);
+			}
+		}
+		totals.turns += result.turns ?? 0;
+		totals.toolCalls += result.toolCalls ?? 0;
+		totals.reasked += result.reasked ?? 0;
+		totals.forced ||= Boolean(result.forced);
+		return {
+			...result,
+			findings: [...findings],
+			turns: totals.turns,
+			toolCalls: totals.toolCalls,
+			reasked: totals.reasked,
+			forced: totals.forced,
+		};
+	};
+
 	let last;
 	for (let attempt = 0; attempt <= TRANSPORT_RETRIES; attempt++) {
 		const remainingMs = deadline - Date.now();
 		if (remainingMs <= 0) {
-			last.reason = "review timeout exceeded";
-			last.retried = attempt;
-			return last;
+			return incomplete(args.agent, "review timeout exceeded", findings, {
+				...totals,
+				closing: last?.closing ?? false,
+				retried: attempt || undefined,
+			});
 		}
-		last = await runRuleReviewerSession({
-			...args,
-			limits: { ...limits, timeoutMs: remainingMs },
-		});
+		if (
+			attempt > 0 &&
+			(totals.turns >= limits.maxTurns ||
+				totals.toolCalls >= limits.maxToolCalls)
+		) {
+			return incomplete(
+				args.agent,
+				"review budget exceeded across transport retry",
+				findings,
+				{ ...totals, closing: last?.closing ?? false, retried: attempt },
+			);
+		}
+		last = combine(
+			await runRuleReviewerSession({
+				...args,
+				limits: {
+					...limits,
+					maxTurns: Math.max(1, limits.maxTurns - totals.turns),
+					maxToolCalls: Math.max(1, limits.maxToolCalls - totals.toolCalls),
+					timeoutMs: remainingMs,
+				},
+			}),
+		);
 		if (last.status === "complete") {
 			if (attempt > 0) last.retried = attempt;
 			return last;

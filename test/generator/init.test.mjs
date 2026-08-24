@@ -19,7 +19,15 @@ import { fileURLToPath } from "node:url";
 import { test } from "node:test";
 
 const sourceRoot = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
-const inheritedPath = process.env.PATH ?? "";
+const isolatedEnvironment = Object.fromEntries(
+	Object.entries(globalThis.process.env).filter(
+		([name]) =>
+			!/(?:TOKEN|SECRET|PASSWORD|CREDENTIAL|API_KEY|ACCESS_KEY|PRIVATE_KEY)/i.test(
+				name,
+			),
+	),
+);
+const inheritedPath = isolatedEnvironment.PATH ?? "";
 
 function git(root, ...args) {
 	return execFileSync(
@@ -62,8 +70,8 @@ function runInit(root, mode, extraEnv = {}) {
 	return execFileSync(join(root, "init.sh"), [mode], {
 		cwd: root,
 		encoding: "utf8",
-		env: { ...process.env, PATH: inheritedPath, ...extraEnv },
-		stdio: process.env.DEBUG_INIT === "1" ? "inherit" : undefined,
+		env: { ...isolatedEnvironment, PATH: inheritedPath, ...extraEnv },
+		stdio: isolatedEnvironment.DEBUG_INIT === "1" ? "inherit" : undefined,
 	});
 }
 
@@ -144,7 +152,7 @@ case " $* " in *" --input - "*) cat >/dev/null ;; esac
 		cwd: root,
 		encoding: "utf8",
 		env: {
-			...process.env,
+			...isolatedEnvironment,
 			GH_LOG: log,
 			GH_STATE: state,
 			PATH: `${bin}:${inheritedPath}`,
@@ -241,7 +249,8 @@ for (const mode of ["rust", "typescript", "rust,typescript"]) {
 			"golden",
 			`${mode.replace(",", "-")}.paths`,
 		);
-		if (process.env.UPDATE_GOLDENS === "1") writeFileSync(golden, actual);
+		if (isolatedEnvironment.UPDATE_GOLDENS === "1")
+			writeFileSync(golden, actual);
 		else assert.equal(actual, readFileSync(golden, "utf8"));
 		writeFileSync(
 			join(root, ".github", "dependabot.yml"),
@@ -257,12 +266,12 @@ for (const mode of ["rust", "typescript", "rust,typescript"]) {
 		}
 		execFileSync("bash", ["scripts/verify.sh", "--structure-only"], {
 			cwd: root,
-			env: process.env,
+			env: isolatedEnvironment,
 		});
 		const incomplete = spawnSync("bash", ["scripts/verify.sh"], {
 			cwd: root,
 			encoding: "utf8",
-			env: process.env,
+			env: isolatedEnvironment,
 		});
 		assert.notEqual(incomplete.status, 0);
 		assert.match(`${incomplete.stdout}${incomplete.stderr}`, /REPLACE_ME/);
@@ -316,12 +325,12 @@ for (const mode of ["rust", "typescript", "rust,typescript"]) {
 			);
 			execFileSync("cargo", ["+1.98.0", "generate-lockfile"], {
 				cwd: root,
-				env: process.env,
+				env: isolatedEnvironment,
 			});
 			execFileSync("bash", ["scripts/verify.sh"], {
 				cwd: root,
-				env: process.env,
-				stdio: process.env.DEBUG_INIT === "1" ? "inherit" : undefined,
+				env: isolatedEnvironment,
+				stdio: isolatedEnvironment.DEBUG_INIT === "1" ? "inherit" : undefined,
 			});
 			for (const [invalid, message] of [
 				[
@@ -347,7 +356,7 @@ for (const mode of ["rust", "typescript", "rust,typescript"]) {
 				const rejected = spawnSync("bash", ["scripts/verify-rust.sh"], {
 					cwd: root,
 					encoding: "utf8",
-					env: process.env,
+					env: isolatedEnvironment,
 				});
 				assert.notEqual(rejected.status, 0);
 				assert.match(`${rejected.stdout}${rejected.stderr}`, message);
@@ -367,7 +376,7 @@ for (const remote of [
 		const result = spawnSync(join(root, "init.sh"), ["rust"], {
 			cwd: root,
 			encoding: "utf8",
-			env: process.env,
+			env: isolatedEnvironment,
 		});
 		assert.notEqual(result.status, 0);
 		assert.match(result.stderr, /canonical agent-rules source/);
@@ -442,7 +451,7 @@ for (const fixture of unsafeInputs) {
 		const result = spawnSync(join(root, "init.sh"), fixture.args, {
 			cwd: root,
 			encoding: "utf8",
-			env: process.env,
+			env: isolatedEnvironment,
 		});
 		assert.notEqual(result.status, 0);
 		assert.match(result.stderr, fixture.expected);
@@ -462,7 +471,7 @@ test("rejects an overlay collision before replacement", (t) => {
 	const result = spawnSync(join(root, "init.sh"), ["rust"], {
 		cwd: root,
 		encoding: "utf8",
-		env: process.env,
+		env: isolatedEnvironment,
 	});
 	assert.notEqual(result.status, 0);
 	assert.match(result.stderr, /overlay collision at README\.md/);
@@ -482,7 +491,7 @@ test("restores bytes modes and symlinks when post-copy verification fails", {
 	const result = spawnSync(join(root, "init.sh"), ["typescript"], {
 		cwd: root,
 		encoding: "utf8",
-		env: { ...process.env, PATH: `${bin}:${inheritedPath}` },
+		env: { ...isolatedEnvironment, PATH: `${bin}:${inheritedPath}` },
 	});
 	assert.notEqual(result.status, 0);
 	assert.match(result.stderr, /original checkout restored/);
@@ -505,7 +514,7 @@ test("restores checkout and Git config when normal setup fails", {
 	const result = spawnSync(join(root, "init.sh"), ["rust"], {
 		cwd: root,
 		encoding: "utf8",
-		env: process.env,
+		env: isolatedEnvironment,
 	});
 	assert.notEqual(result.status, 0);
 	assert.match(result.stderr, /original checkout restored/);

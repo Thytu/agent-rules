@@ -17,6 +17,12 @@ Then:
 4. Make the first passing commit.
 5. Run `bash scripts/setup-github.sh`.
 
+## Repository workflow
+
+History is append-only: fix forward; never amend, rebase, or force-push. Merge `main` into the branch when synchronization is required.
+
+Everything lands by squash merge and the branch is deleted. The pull-request description is the decision record and preserves every relevant decision and user-visible outcome before merge. Integration-owned manifests, locks, workflows, and shared policy change through the integration owner rather than by bypassing repository guards.
+
 ## Stable commands
 
 - `bash scripts/setup.sh` — install pinned selected tooling and hooks.

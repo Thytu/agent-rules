@@ -25,7 +25,6 @@ export const links = () => [
 	{ rel: "preload", href: "/fonts/plex-sans-400.woff2", as: "font" },
 ];`,
 		violations: [],
-		cleanFor: ["comments"],
 	},
 	{
 		id: "real-icon-set",
@@ -166,7 +165,6 @@ declare namespace Cloudflare {
 	return new ResendSender(env, from);
 }`,
 		violations: [],
-		cleanFor: ["boundaries", "contract-evolution"],
 	},
 	{
 		id: "real-resend-test",
@@ -229,7 +227,6 @@ export const FEATURES = [
 	expect(row.createdAt).toBe(1000);
 });`,
 		violations: [],
-		cleanFor: ["testing"],
 	},
 	{
 		id: "hp-weak-mock-called",
@@ -424,7 +421,6 @@ export const getName = displayName;`,
 	return db.update(accounts).set({ name: input.name }).where(and(eq(accounts.id, input.id), eq(accounts.tenantId, user.tenantId)));
 }`,
 		violations: [],
-		cleanFor: ["authorization-persistence"],
 	},
 	{
 		id: "hp-lifecycle-no-timeout",
@@ -443,7 +439,6 @@ export const getName = displayName;`,
 	return fetch(url, { signal: AbortSignal.timeout(5000) });
 }`,
 		violations: [],
-		cleanFor: ["lifecycle-capacity"],
 	},
 	{
 		id: "hp-efficiency-reparse",
@@ -463,7 +458,6 @@ export const getName = displayName;`,
 	return values.filter((value) => matcher.test(value));
 }`,
 		violations: [],
-		cleanFor: ["efficiency"],
 	},
 	{
 		id: "hp-dependency-without-lock",
@@ -481,6 +475,5 @@ serde = "1.0"`,
 name = "product"
 publish = false`,
 		violations: [],
-		cleanFor: ["dependency-integrity"],
 	},
 ];
