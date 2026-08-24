@@ -47,7 +47,14 @@ function git(root, ...args) {
 
 function repository(t, remote = "https://github.com/example/product.git") {
 	const temp = mkdtempSync(join(tmpdir(), "agent-rules-init-"));
-	t.after(() => rmSync(temp, { recursive: true, force: true }));
+	t.after(() =>
+		rmSync(temp, {
+			recursive: true,
+			force: true,
+			maxRetries: 5,
+			retryDelay: 50,
+		}),
+	);
 	const root = join(temp, "repo");
 	cpSync(sourceRoot, root, {
 		recursive: true,
