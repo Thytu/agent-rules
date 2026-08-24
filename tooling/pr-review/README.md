@@ -6,13 +6,15 @@ The source reviewer runs exactly eight independent owner reviews, one per top-le
 
 - `agents.mjs` discovers and sorts the eight top-level rule documents and fails if the count differs from the declared budget. There are no profile reviewers or marker stubs.
 - `core.mjs` loads each document verbatim and configures Pi's native OpenAI
-  Responses provider for `gpt-5.6-luna`. Requests use Flex processing. A
-  `429 resource_unavailable` response is retried once with standard processing;
-  other rate-limit, authentication, and validation failures retain their real
-  semantics. `FINDING_LIMITS` bounds what reaches GitHub, and requests use the
-  model catalog's explicit `maxTokens` ceiling so a valid multi-tool response is
-  not truncated. Cost remains bounded by the shared 15-minute deadline,
-  60-turn and 200-tool ceilings, and `SUBMISSIONS_PER_RESPONSE`.
+  Responses provider for `gpt-5.6-luna`. Production requests use high reasoning
+  and Flex processing. `OPENAI_REASONING=off` exists only for controlled
+  evaluation. A `429 resource_unavailable` response is retried once with
+  standard processing; other rate-limit, authentication, and validation
+  failures retain their real semantics. `FINDING_LIMITS` bounds what reaches
+  GitHub, and requests use the model catalog's explicit `maxTokens` ceiling so a
+  valid multi-tool response is not truncated. Cost remains bounded by the shared
+  15-minute deadline, 60-turn and 200-tool ceilings, and
+  `SUBMISSIONS_PER_RESPONSE`.
 
 - `agent.mjs` gives each rule owner its own `@earendil-works/pi-agent-core`
   `Agent`. Its initial context is a compact changed-file index (status, path,
@@ -29,6 +31,13 @@ The source reviewer runs exactly eight independent owner reviews, one per top-le
   findings into the existing deterministic posting pipeline in `inline.mjs`.
 
 The reviewer creates eight top-level whole-PR owner reviews, never one review per changed file. All eight run in one parallel wave. A ninth document fails before model use until the owner and cost contract is changed explicitly.
+
+The eight sessions do not see one another's prompts, tool calls, reasoning, or
+findings and cannot coordinate. Each receives only its assigned rule document in
+the system prompt plus the same repository tools. Repository search can expose
+the other checked-in rule files as ordinary source context; it never exposes
+another live review. Findings meet only after all sessions return, when the
+deterministic posting layer merges related comments.
 
 The launcher does not rank files, create clusters, prescribe traversal order, or
 encode a delegation workflow. Its only orchestration is independent rule-owner
@@ -55,12 +64,13 @@ without ever submitting a finding. Prose was never read by anything; now there i
 no channel for it, which is enforcement rather than instruction.
 
 `submit_finding` is the validation boundary. Pi checks the arguments against the
-finding schema before the tool runs, so a malformed submission comes back as an
-error the reviewer can act on. Beyond the schema, submissions are refused — never
-silently accepted, never fatal — when they cite a file the pull request does not
-change, when they exceed `SUBMISSIONS_PER_RESPONSE` in one response, in which
-case the reviewer is told to re-issue them next turn, or when the submission
-clears its own subject instead of reporting a violation.
+finding schema before the tool runs, then the repository verifies that the cited
+quote occurs on the claimed added line. A malformed or unsupported submission
+comes back as an error the reviewer can act on. Submissions are also refused —
+never silently accepted, never fatal — when they cite a file the pull request
+does not change, when they exceed `SUBMISSIONS_PER_RESPONSE` in one response, in
+which case the reviewer is told to re-issue them next turn, or when the
+submission clears its own subject instead of reporting a violation.
 
 That last one is a refusal because prompting did not stop it. Three prompts say a
 file you inspected and cleared is not part of the review, and reviewers still
@@ -161,9 +171,9 @@ Findings land as one advisory GitHub review (`event: COMMENT`), with one thread 
 anchored finding.
 
 - **Anchoring:** the agent supplies an absolute new-file line and exact quote.
-  The line is accepted only when that quote matches an added diff line. Existing
-  quote and snippet-map fallbacks remain for compatibility; unanchorable findings
-  become file-level comments.
+  The submission boundary accepts it only when that quote matches the claimed
+  added diff line, so every banked model finding is anchorable. Existing quote
+  and snippet-map fallbacks remain for non-agent compatibility inputs.
 - **Fallbacks:** file-level failure demotes to the review body; rejected inline
   reviews retry with body findings; a second review failure falls back to the
   summary comment. Findings are not silently dropped.
@@ -204,22 +214,35 @@ against existing comments using read-only GitHub calls.
 
 ## Evaluation
 
-`review.mjs` now evaluates the production autonomous-agent boundary. Each fixture
-is exposed as a one-file pull request with the same repository tools, every rule
-owner gets its own session, and any incomplete session aborts the run rather than
-being scored as a clean prediction.
+`review.mjs` evaluates the production autonomous-agent boundary. Every fixture
+contains a multi-file base/head repository snapshot with unchanged source,
+types, callers, tests, and configuration available through the same repository
+tools used in production. Every rule owner gets its own session, and any
+incomplete session aborts the run rather than being scored as a clean prediction.
 
 ```bash
 OPENAI_API_KEY=... OPENAI_MODEL=gpt-5.6-luna \
-  RUNS=5 node tooling/pr-review/review.mjs holdout
-OPENAI_API_KEY=... node tooling/pr-review/review.mjs dev
+  OPENAI_REASONING=high RUNS=5 node tooling/pr-review/review.mjs holdout
+OPENAI_API_KEY=... OPENAI_REASONING=high node tooling/pr-review/review.mjs dev
 ```
 
-Flex is the default. Set `OPENAI_SERVICE_TIER=default` to request standard
-processing from the start; Flex resource exhaustion falls back automatically.
+High reasoning is the production default. `OPENAI_REASONING=off` reproduces the
+disabled-reasoning control. `CASE_IDS=id-a,id-b` limits a diagnostic run to
+explicit fixtures; `PAIR_IDS=case-a:owner-a,case-b:owner-b` selects exact
+owner/case decisions. Flex is the default service tier. Set
+`OPENAI_SERVICE_TIER=default` to request standard processing from the start;
+Flex resource exhaustion falls back automatically.
+
+A balanced 16-pair diagnostic (one positive and one clean case per owner, three
+runs each) measured reasoning off at P=63.9%, R=95.8%, F1=76.7% and high at
+P=66.7%, R=100%, F1=80.0%. This supports the high-reasoning default but is not a
+replacement for a complete development or holdout run.
 
 The evaluator prints micro and per-owner precision, recall, and F1. Development
 cases are available while tuning; holdout cases remain separate to expose
 overfitting. Results are a baseline only when every owner completes.
 
-The committed corpus has 36 development and 43 holdout fixtures. With eight owners, one run performs 288 and 344 owner evaluations respectively, or 632 for both. A retryable transport drop can add at most one provider session to an owner evaluation without resetting its limits.
+The committed corpus has 36 development and 43 holdout fixtures. With eight
+owners, one run performs 288 and 344 owner evaluations respectively, or 632 for
+both. A retryable transport drop can add at most one provider session to an owner
+evaluation without resetting its limits.

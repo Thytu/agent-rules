@@ -69,6 +69,7 @@ function repository(changes, toolResults = {}) {
 		baseSha: "base123",
 		headSha: "head456",
 		changes,
+		validateFinding: toolResults.validateFinding ?? (() => true),
 		async executeTool(name, args) {
 			const result = toolResults[name];
 			return typeof result === "function"
@@ -86,6 +87,7 @@ function fauxRuntime(responses) {
 	return {
 		runtime: {
 			model: faux.getModel(),
+			reasoning: "off",
 			streamFn: models.streamSimple.bind(models),
 		},
 		faux,
@@ -831,6 +833,36 @@ test("a finding citing a file the pull request does not change is refused, not b
 	assert.ok(
 		seen[0].some((text) => /does not change/.test(text)),
 		`no rejection reached the model: ${JSON.stringify(seen[0])}`,
+	);
+});
+
+test("a finding whose quote is not on its claimed added line is refused", async () => {
+	const seen = [];
+	const { runtime } = fauxRuntime([
+		submits([violation(0), violation(1)], "a"),
+		(context) => {
+			seen.push(toolResultTexts(context.messages));
+			return done(1);
+		},
+	]);
+
+	const result = await runRuleReviewer({
+		agent: BOUNDARIES,
+		system: "SYSTEM RULE",
+		repository: repository(THREE_FILES, {
+			validateFinding: (finding) => finding.quote !== "unsafeCall(0)",
+		}),
+		runtime,
+	});
+
+	assert.equal(result.status, "complete", result.reason);
+	assert.deepEqual(
+		result.findings.map((finding) => finding.quote),
+		["unsafeCall(1)"],
+	);
+	assert.ok(
+		seen[0].some((text) => /does not occur on added line/.test(text)),
+		`no evidence rejection reached the model: ${JSON.stringify(seen[0])}`,
 	);
 });
 

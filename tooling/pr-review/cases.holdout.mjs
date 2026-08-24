@@ -1,19 +1,20 @@
+import { defineFixtures } from "./fixture-repository.mjs";
+import { OPENROSTRUM_FILES } from "./openrostrum-snapshot.mjs";
+
 // HELD-OUT test set — the real generalization metric. It is NEVER used to tune
 // the doctrine: the prompt must not be edited in reaction to any failure here.
 //
 // Two kinds:
-//  - source:"real"  — verbatim snippets from the OpenRostrum codebase. Most are
-//    clean (legit WHY comments, real regression tests, sanctioned throws) — the
-//    true false-positive test, since the repo is doctrine-compliant. Being real
-//    production code, they are out-of-distribution from the synthetic dev set.
-//  - source:"authored" — held-out positives whose surface form is deliberately
-//    UNLIKE both the doctrine's examples and the dev set, so recall on the rarer
-//    categories can be probed without teaching to the test.
+//  - source:"real" exposes a complete OpenRostrum source file plus its real
+//    transitive local imports, package manifest, lockfile, and configuration.
+//    Most are clean: legitimate WHY comments, regression tests, and sanctioned
+//    throws from a doctrine-compliant production repository.
+//  - source:"authored" adds a complete changed module to the shared multi-file
+//    fixture application. Its positives use surfaces unlike the development set.
 //
-// Borderline/ambiguous real snippets are excluded so the labels are a trustworthy
-// oracle, not a coin-flip.
+// Borderline real changes are excluded so labels remain an oracle, not a coin flip.
 
-export const cases = [
+const specs = [
 	// ---------- real, clean: legit WHY comments (must stay silent) ----------
 	{
 		id: "real-root-fonts",
@@ -247,7 +248,7 @@ export const FEATURES = [
 	// pricing isn't built yet, return free for now
 	return 0;
 }`,
-		violations: ["contract-evolution"],
+		violations: ["comments", "contract-evolution"],
 	},
 	{
 		id: "hp-shortcut-default-on-catch",
@@ -260,7 +261,7 @@ export const FEATURES = [
 		return {};
 	}
 }`,
-		violations: ["boundaries"],
+		violations: ["boundaries", "lifecycle-capacity"],
 	},
 	{
 		id: "hp-legacy-deprecated-fn",
@@ -369,7 +370,7 @@ export async function enrich(db, ids) {
 	for (const id of ids) out.push(await db.get(id));
 	return out;
 }`,
-		violations: ["contract-evolution", "efficiency"],
+		violations: ["comments", "contract-evolution", "efficiency"],
 	},
 	{
 		id: "hp-shortcut-empty-list-catch",
@@ -382,7 +383,7 @@ export async function enrich(db, ids) {
 		return [];
 	}
 }`,
-		violations: ["boundaries"],
+		violations: ["boundaries", "lifecycle-capacity"],
 	},
 	{
 		id: "hp-legacy-renamed-column",
@@ -391,7 +392,7 @@ export async function enrich(db, ids) {
 		code: `export function emailOf(row) {
 	return row.email ?? row.emailAddress;
 }`,
-		violations: ["contract-evolution"],
+		violations: ["boundaries", "contract-evolution"],
 	},
 	{
 		id: "hp-legacy-compat-export",
@@ -426,7 +427,7 @@ export const getName = displayName;`,
 		id: "hp-lifecycle-no-timeout",
 		source: "authored",
 		file: "app/ports/provider.ts",
-		code: `export async function fetchProvider(url) {
+		code: `export async function fetchProvider(url: URL) {
 	return fetch(url);
 }`,
 		violations: ["lifecycle-capacity"],
@@ -435,7 +436,7 @@ export const getName = displayName;`,
 		id: "trap-lifecycle-deadline",
 		source: "authored",
 		file: "app/ports/provider.ts",
-		code: `export async function fetchProvider(url) {
+		code: `export async function fetchProvider(url: URL) {
 	return fetch(url, { signal: AbortSignal.timeout(5000) });
 }`,
 		violations: [],
@@ -477,3 +478,59 @@ publish = false`,
 		violations: [],
 	},
 ];
+
+const REAL_ANCHORS = {
+	"real-bs-capabilities": "// The nine jobs that make up the program side",
+	"real-entry-bots": "// Ensure requests from bots and SPA Mode renders",
+	"real-email-throw": "export function createResendEmailSender",
+	"real-resend-test": 'it("throws on a non-2xx provider response',
+	"real-worker-env": "// Runtime SECRETS",
+};
+
+function withoutReviewedSubject(spec, code) {
+	const sourceLines = spec.code.split("\n");
+	const first = sourceLines.find((line) => line.trim())?.trim();
+	const anchor = REAL_ANCHORS[spec.id] ?? first;
+	const lines = code.split("\n");
+	const start = lines.findIndex((line) => line.trim().startsWith(anchor));
+	if (start < 0)
+		throw new Error(
+			`${spec.id} subject is absent from its captured source file`,
+		);
+
+	let end = start;
+	if (lines[start].trim().startsWith("//")) {
+		while (end + 1 < lines.length && lines[end + 1].trim().startsWith("//"))
+			end++;
+	} else {
+		let braces = 0;
+		let opened = false;
+		for (; end < lines.length; end++) {
+			for (const character of lines[end]) {
+				if (character === "{") {
+					braces++;
+					opened = true;
+				} else if (character === "}") braces--;
+			}
+			if (opened && braces === 0) break;
+		}
+	}
+	return [...lines.slice(0, start), ...lines.slice(end + 1)].join("\n");
+}
+
+export const cases = defineFixtures(
+	specs.map((spec) => {
+		if (spec.source !== "real") return spec;
+		const code = OPENROSTRUM_FILES[spec.file];
+		if (code === undefined)
+			throw new Error(`${spec.id} has no captured OpenRostrum source file`);
+		const contextFiles = { ...OPENROSTRUM_FILES };
+		delete contextFiles[spec.file];
+		return {
+			...spec,
+			code,
+			baseCode: withoutReviewedSubject(spec, code),
+			contextFiles,
+		};
+	}),
+);

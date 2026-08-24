@@ -3,6 +3,7 @@ import { test } from "node:test";
 import {
 	createFlexFallbackFetch,
 	DEFAULT_MODEL,
+	DEFAULT_REASONING,
 	FINDING_LIMITS,
 	makeRuntime,
 	streamOptions,
@@ -24,6 +25,7 @@ test("the runtime uses Pi's native GPT-5.6 Luna Responses contract", () => {
 	assert.equal(runtime.model.thinkingLevelMap?.off, "none");
 	assert.equal(runtime.model.maxTokens, 128_000);
 	assert.equal(runtime.serviceTier, "flex");
+	assert.equal(runtime.reasoning, DEFAULT_REASONING);
 });
 
 test("stream options request Flex processing and required tools", () => {
@@ -60,6 +62,30 @@ test("runtime preserves Flex and tool requirements through Pi", async () => {
 	assert.equal(payload.model, DEFAULT_MODEL);
 	assert.equal(payload.service_tier, "flex");
 	assert.equal(payload.tool_choice, "required");
+	assert.equal(payload.reasoning.effort, "high");
+});
+
+test("the runtime can reproduce the reasoning-off control", async () => {
+	let payload;
+	const runtime = makeRuntime({
+		key: "test-key",
+		reasoning: "off",
+		fetchFn: async (_input, init) => {
+			payload = JSON.parse(init.body);
+			return new Response(
+				JSON.stringify({ error: { message: "stop after capture" } }),
+				{ status: 400, headers: { "content-type": "application/json" } },
+			);
+		},
+	});
+	const stream = runtime.streamFn(
+		runtime.model,
+		{ systemPrompt: "review", messages: [], tools: [] },
+		{ toolChoice: "required" },
+	);
+	await stream.result();
+
+	assert.equal(payload.reasoning.effort, "none");
 });
 
 test("Flex resource exhaustion retries once with standard processing", async () => {

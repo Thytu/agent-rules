@@ -9,6 +9,7 @@ import { loadAgents, REPO_ROOT } from "./agents.mjs";
 export const DEFAULT_BASE_URL = "https://api.openai.com/v1";
 export const DEFAULT_MODEL = "gpt-5.6-luna";
 export const DEFAULT_SERVICE_TIER = "flex";
+export const DEFAULT_REASONING = "high";
 const STANDARD_SERVICE_TIER = "default";
 
 // Per-field ceilings for one finding. The prompt states these numbers and the
@@ -137,8 +138,15 @@ export function makeRuntime({
 	model = DEFAULT_MODEL,
 	temperature,
 	serviceTier = DEFAULT_SERVICE_TIER,
+	reasoning = DEFAULT_REASONING,
 	fetchFn = globalThis.fetch,
 }) {
+	if (
+		!["off", "minimal", "low", "medium", "high", "xhigh", "max"].includes(
+			reasoning,
+		)
+	)
+		throw new Error(`Unsupported reasoning level: ${reasoning}`);
 	if (!["flex", "auto", "default"].includes(serviceTier))
 		throw new Error(`Unsupported OpenAI service tier: ${serviceTier}`);
 
@@ -176,9 +184,11 @@ export function makeRuntime({
 	return {
 		model: activeModel,
 		serviceTier,
+		reasoning,
 		api,
 		streamFn(selectedModel, context, options = {}) {
-			const { reasoning, ...providerOptions } = options;
+			const { reasoning: requestedReasoning = reasoning, ...providerOptions } =
+				options;
 			return models.stream(
 				selectedModel,
 				context,
@@ -190,7 +200,7 @@ export function makeRuntime({
 					fetchFn: requestFetch,
 					options: {
 						...providerOptions,
-						...(reasoning ? { reasoningEffort: reasoning } : {}),
+						reasoningEffort: requestedReasoning,
 					},
 				}),
 			);

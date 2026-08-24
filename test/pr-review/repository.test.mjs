@@ -172,6 +172,22 @@ test("repository tools expose changed diffs and unchanged context on demand", as
 	});
 	assert.equal(diff.ok, true);
 	assert.match(diff.content, /\+import \{ sharedHelper \}/);
+	assert.equal(
+		repository.validateFinding({
+			file: "changed.ts",
+			line: 1,
+			quote: "import { sharedHelper }",
+		}),
+		true,
+	);
+	assert.equal(
+		repository.validateFinding({
+			file: "changed.ts",
+			line: 1,
+			quote: "export const value",
+		}),
+		false,
+	);
 
 	const unchanged = await repository.executeTool("read_file", {
 		path: "unchanged.ts",

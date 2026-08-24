@@ -129,7 +129,8 @@ function clearsItsOwnSubject({ rule, why }) {
 // The bank. Every finding enters the review through this one tool call, so this
 // is where the boundary lives: Pi checks the arguments against FINDING before
 // execute runs, and what survives both is clamped, stamped, and counted.
-function createFindingSink(agent, changedPaths) {
+function createFindingSink(agent, repository) {
+	const changedPaths = new Set(repository.changes.map((change) => change.path));
 	const findings = [];
 	const seen = new Set();
 
@@ -145,6 +146,10 @@ function createFindingSink(agent, changedPaths) {
 				if (!changedPaths.has(params.file))
 					throw new Error(
 						`this finding cites ${params.file}, which this pull request does not change; quote a line from a changed file instead`,
+					);
+				if (!repository.validateFinding(params))
+					throw new Error(
+						`this finding's quote does not occur on added line ${params.line} of ${params.file}; cite the exact changed line and absolute new-file line`,
 					);
 				if (clearsItsOwnSubject(params))
 					throw new Error(
@@ -313,8 +318,7 @@ async function runRuleReviewerSession({
 	runtime,
 	limits,
 }) {
-	const changedPaths = new Set(repository.changes.map((change) => change.path));
-	const sink = createFindingSink(agent, changedPaths);
+	const sink = createFindingSink(agent, repository);
 	const terminal = createTerminal();
 	let closed;
 	// Keyed by the assistant message that requested the calls, so the count is
@@ -333,7 +337,7 @@ async function runRuleReviewerSession({
 		initialState: {
 			systemPrompt: system,
 			model: runtime.model,
-			thinkingLevel: "off",
+			thinkingLevel: runtime.reasoning,
 			tools: [...createRepositoryTools(repository), sink.tool, terminal.tool],
 		},
 		// Every response must be a tool call. A prior provider migration exposed the

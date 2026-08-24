@@ -1,6 +1,7 @@
 import { execFileSync, spawnSync } from "node:child_process";
 import { isAbsolute, posix } from "node:path";
 import { Type } from "@earendil-works/pi-ai";
+import { parseDiff } from "./inline.mjs";
 
 const MAX_BUFFER = 128 * 1024 * 1024;
 const MAX_PAGE_LINES = 400;
@@ -299,11 +300,20 @@ export function createGitRepository({ repoRoot, baseSha, headSha }) {
 		);
 	}
 
+	function validateFinding({ file, line, quote }) {
+		const { newLines } = parseDiff(getRawDiff(file));
+		const claimed = newLines.find(
+			(candidate) => candidate.added && candidate.line === line,
+		);
+		return Boolean(claimed && claimed.text.includes(String(quote).trim()));
+	}
+
 	return {
 		baseSha: mergeBase,
 		headSha,
 		changes,
 		executeTool,
 		getRawDiff,
+		validateFinding,
 	};
 }

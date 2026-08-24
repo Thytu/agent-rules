@@ -1,9 +1,10 @@
-// Labeled gold set for the reviewer. Each case is a small changed-file snippet;
-// `violations` is the agent id(s) — the docs/rules/<id>.md whose rules it breaks
-// (empty = clean). The corpus gives every owner positive and clean traps so
-// false positives and misses remain visible after the owner split.
+import { defineFixtures } from "./fixture-repository.mjs";
 
-export const cases = [
+// Labeled gold repositories for the reviewer. Every case contains a complete
+// base/head repository snapshot; `violations` exhaustively names every rule
+// owner whose document the changed code violates (empty = clean).
+
+export const cases = defineFixtures([
 	// ---- bs-comment: violations ----
 	{
 		id: "bs-restates-name",
@@ -29,7 +30,7 @@ export const MAX_UPLOAD_MB = 25;`,
 export function loadSpeakers(db, eventId) {
 	return db.select().from(contacts).where(eq(contacts.eventId, eventId));
 }`,
-		violations: ["comments"],
+		violations: ["comments", "authorization-persistence"],
 	},
 	{
 		id: "bs-justification-prose",
@@ -49,21 +50,33 @@ export function SubmissionsMock() {
 		file: "app/lib/auth.ts",
 		code: `// Cloudflare Workers hard-caps PBKDF2 at 100k iterations; a higher value
 // throws only in production (workerd does not enforce it locally).
-const PBKDF2_ITERATIONS = 100_000;`,
+export const PBKDF2_ITERATIONS = 100_000;`,
 		violations: [],
 	},
 	{
 		id: "ok-platform-why",
 		file: "app/db/write.ts",
-		code: `// D1 has no interactive transactions, so batch() is the only atomic multi-write.
-await db.batch([insertUser, insertProfile]);`,
+		code: `export interface AtomicDatabase {
+	batch(writes: readonly unknown[]): Promise<void>;
+}
+
+// D1 has no interactive transactions, so batch() is the only atomic multi-write.
+export async function writeUserProfile(db: AtomicDatabase, insertUser: unknown, insertProfile: unknown) {
+	await db.batch([insertUser, insertProfile]);
+}`,
 		violations: [],
 	},
 	{
 		id: "ok-security-why",
 		file: "app/routes/admin.submissions.tsx",
-		code: `// Server-derive the tenant; never trust a client-supplied eventId.
-const eventId = (await getActiveEvent(env, user)).id;`,
+		code: `import type { AuthenticatedUser, RuntimeEnv } from "../runtime";
+
+declare function getActiveEvent(env: RuntimeEnv, user: AuthenticatedUser): Promise<{ id: string }>;
+
+// Server-derive the tenant; never trust a client-supplied eventId.
+export async function activeEventId(env: RuntimeEnv, user: AuthenticatedUser) {
+	return (await getActiveEvent(env, user)).id;
+}`,
 		violations: [],
 	},
 	{
@@ -146,7 +159,7 @@ it("has welcome copy", () => {
 export async function allSubmissions(db) {
 	return db.select().from(submissions);
 }`,
-		violations: ["contract-evolution"],
+		violations: ["authorization-persistence", "comments", "contract-evolution"],
 	},
 	{
 		id: "shortcut-hardcoded-id",
@@ -155,7 +168,7 @@ export async function allSubmissions(db) {
 	// for now just grab the seeded event
 	return db.query.events.findFirst({ where: eq(events.id, "evt_demo_123") });
 }`,
-		violations: ["contract-evolution"],
+		violations: ["authorization-persistence", "comments", "contract-evolution"],
 	},
 	{
 		id: "shortcut-swallowed-error",
@@ -167,7 +180,7 @@ export async function allSubmissions(db) {
 		// ignore
 	}
 }`,
-		violations: ["boundaries"],
+		violations: ["boundaries", "comments", "lifecycle-capacity"],
 	},
 	{
 		id: "shortcut-noop-validation",
@@ -176,27 +189,36 @@ export async function allSubmissions(db) {
 	// v0, skip validation for now, revisit later
 	return true;
 }`,
-		violations: ["contract-evolution"],
+		violations: ["boundaries", "comments", "contract-evolution"],
 	},
 
 	// ---- shortcut: clean traps ----
 	{
 		id: "ok-sanctioned-throw",
 		file: "app/ports/airtable.ts",
-		code: `export function createAirtableSync(env) {
+		code: `import type { RuntimeEnv } from "../runtime";
+import { AirtableSync } from "./airtable-client";
+
+export function createAirtableSync(env: RuntimeEnv) {
 	if (!env.AIRTABLE_API_KEY) {
 		throw new Error("AIRTABLE_API_KEY is not configured; set it to enable sync.");
 	}
-	return new AirtableSync(env);
+	return new AirtableSync(env.AIRTABLE_API_KEY);
 }`,
+		contextFiles: {
+			"app/ports/airtable-client.ts": `export class AirtableSync {
+	constructor(readonly apiKey: string) {}
+}`,
+		},
 		violations: [],
 	},
 	{
 		id: "ok-bounded-logged",
 		file: "app/lib/recent.ts",
-		code: `export async function recentSubmissions(db, eventId) {
+		code: `export async function recentSubmissions(db, request) {
+	const user = await requireUser(request);
 	const rows = await db.select().from(submissions)
-		.where(eq(submissions.eventId, eventId)).limit(50);
+		.where(eq(submissions.tenantId, user.tenantId)).limit(50);
 	if (rows.length === 50) log("recentSubmissions truncated at 50");
 	return rows;
 }`,
@@ -220,14 +242,14 @@ export { EmailSender as Mailer } from "./sender";`,
 		? row.status
 		: (row.status?.value ?? "pending");
 }`,
-		violations: ["contract-evolution"],
+		violations: ["boundaries", "contract-evolution"],
 	},
 	{
 		id: "legacy-parallel-v2",
 		file: "app/lib/serialize.ts",
 		code: `export function serializeSession(s) { return { id: s.id, title: s.title }; }
 export function serializeSessionV2(s) { return { id: s.id, title: s.title, track: s.track }; }`,
-		violations: ["contract-evolution"],
+		violations: ["boundaries", "contract-evolution"],
 	},
 
 	// ---- legacy-shim: clean traps (sanctioned compat boundaries) ----
@@ -244,9 +266,14 @@ export function apiEnvelope(rows, page) {
 	{
 		id: "ok-ics-stable-uid",
 		file: "app/lib/ics.ts",
-		code: `// Stable UID per session so calendar clients update the event in place
+		code: `export interface CalendarEvent { uid?: string }
+export interface Session { id: string }
+
+// Stable UID per session so calendar clients update the event in place
 // instead of creating a duplicate on reschedule.
-event.uid = "session-" + session.id + "@openrostrum.com";`,
+export function assignStableUid(event: CalendarEvent, session: Session) {
+	event.uid = "session-" + session.id + "@openrostrum.com";
+}`,
 		violations: [],
 	},
 
@@ -278,7 +305,7 @@ event.uid = "session-" + session.id + "@openrostrum.com";`,
 		deliver(routes[event.type], event);
 	}
 }`,
-		violations: ["efficiency"],
+		violations: ["boundaries", "efficiency"],
 	},
 
 	// ---- lifecycle and cost: clean traps ----
@@ -311,7 +338,7 @@ export async function getUser(db, id) {
 	// TODO: cache this later
 	return db.query.users.findFirst({ where: eq(users.id, id) });
 }`,
-		violations: ["comments", "contract-evolution"],
+		violations: ["authorization-persistence", "comments", "contract-evolution"],
 	},
 	{
 		id: "ok-documented-fallback",
@@ -337,7 +364,9 @@ export function verifyTurnstile(env, token) {
 		file: "app/lib/contacts.ts",
 		code: `export async function listContacts(db, request) {
 	const user = await requireUser(request);
-	return db.select().from(contacts).where(eq(contacts.tenantId, user.tenantId));
+	const rows = await db.select().from(contacts)
+		.where(eq(contacts.tenantId, user.tenantId)).limit(50);
+	return { rows, truncated: rows.length === 50 };
 }`,
 		violations: [],
 	},
@@ -359,4 +388,4 @@ export function verifyTurnstile(env, token) {
 }`,
 		violations: [],
 	},
-];
+]);
