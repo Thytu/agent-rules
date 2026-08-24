@@ -5,7 +5,7 @@
 // archive. Compatibility exists only at owner-decided external boundaries
 // (see docs/rules/engineering.md → No legacy).
 const COMPAT_COMMENT =
-	/@deprecated|backwards?[- ]compat|kept for (old|compat|legacy)|for old (callers|clients|formats?)|supports? the old\b|\blegacy (path|format|behavio|support)|old format\b/i;
+	/@deprecated|backwards?[- ]compat|kept for (old|compat|legacy)|for old (callers|clients|formats?)|supports? the old\b|\blegacy (path|format|behavior|behaviour|support)|old format\b/i;
 const COMPAT_NAME = /^(legacy|deprecated)|(Legacy|Deprecated)/;
 
 export const noCompatShims = {

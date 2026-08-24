@@ -1,0 +1,67 @@
+module: materializer
+touches:
+  files:
+    - init.sh
+    - template/
+    - scripts/setup-source.sh
+    - scripts/setup-github.sh
+    - AGENTS.md
+    - README.md
+    - SCOPE.md
+    - VERIFICATION.md
+    - package.json
+    - pnpm-lock.yaml
+    - .npmrc
+    - biome.json
+    - eslint.config.mjs
+    - .githooks/
+    - docs/rules/engineering.md
+    - docs/rules/process.md
+    - docs/rules/tech-stack.md
+    - docs/profiles/rust.md
+    - docs/profiles/typescript.md
+    - docs/scenarios/README.md
+    - docs/scenarios/GAP-REGISTER.md
+    - tooling/eslint-rules/
+    - tooling/pr-review/
+    - .github/dependabot.yml
+    - .github/PULL_REQUEST_TEMPLATE.md
+    - .github/workflows/ci.yml
+    - .github/workflows/guard.yml
+    - .github/workflows/ai-review.yml
+  tables: []
+  ports: []
+  routes: []
+scenarios:
+  - id: INIT-S1
+    name: Materialize each supported language selection
+    persona: repository owner
+    steps: |
+      1. Create three clean main-branch Git repositories from the committed template.
+      2. Run ./init.sh rust, ./init.sh typescript, and ./init.sh rust,typescript respectively.
+      3. Run structural verification and each selected language gate.
+    success_signals:
+      - Each tree exactly matches its committed pristine path golden before installed caches are excluded.
+      - Each tree contains only selected runtimes, configs, dependencies, commands, and profile documents.
+      - "EXPERIENCE: each owner sees one successful command and a short list of product contracts to fill next."
+  - id: INIT-S2
+    name: Reject unsafe input without modifying it
+    persona: repository owner
+    steps: |
+      1. Exercise invalid selection, non-main branch, staged changes, modified tracked files, ordinary untracked files, ignored secrets, extra empty directories, and canonical source remote.
+      2. Inject hostile GIT environment and config variables.
+      3. Compare every byte, mode, symlink, Git index, and entry after rejection.
+    success_signals:
+      - Every unsafe input fails before replacement.
+      - The original repository and Git metadata are entry-for-entry unchanged.
+      - "EXPERIENCE: the error names the exact unsafe precondition and recovery action."
+  - id: INIT-S3
+    name: Restore a failed replacement
+    persona: repository owner
+    steps: |
+      1. Inject failures during file copy and post-copy verification.
+      2. Allow the rollback trap to run.
+      3. Compare the checkout with its original committed state.
+    success_signals:
+      - Bytes, modes, symlinks, index, and all original entries are restored; generated extras are absent.
+      - "EXPERIENCE: failure is explicit and the repository remains immediately usable."

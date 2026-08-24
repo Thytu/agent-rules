@@ -7,7 +7,17 @@
 	},
 	"files": {
 		"ignoreUnknown": true,
-		"includes": ["**", "!.agents", "!build", "!dist", "!coverage", "!docs"]
+		"includes": [
+			"**",
+			"!.agents",
+			"!.agent-rules",
+			"!node_modules",
+			"!template",
+			"!build",
+			"!dist",
+			"!coverage",
+			"!docs"
+		]
 	},
 	"formatter": {
 		"enabled": true,

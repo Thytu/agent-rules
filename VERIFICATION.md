@@ -1,30 +1,32 @@
-# Verification — the ground-truth gate
+# Verification — generator ground truth
 
-We do **not** dictate the method (no mandated Playwright). We provision access. A feature is not done until a reviewer has exercised the real thing and shown the result.
+The source gate is `pnpm verify`. It must prove the materializer and every emitted repository boundary, not merely lint source files.
 
-Pure-aesthetic choices have no functional oracle. Everything functional, the agent proves itself.
+## Required evidence
 
-## Capability inventory
+1. Generate Rust, TypeScript, and mixed outputs in fresh temporary Git repositories.
+2. Compare each pristine output with its committed complete path golden.
+3. Run structural setup and verification in every output.
+4. Exercise the selected language verifier in each mode.
+5. Prove unselected runtimes, configs, dependencies, commands, and prose are absent.
+6. Prove invalid mode, dirty/staged/untracked/ignored input, collision, hostile Git environment, and injected copy failure leave the original checkout byte/mode/symlink identical.
+7. Prove product paths added after initialization are permitted while generator, unselected, and guarded ownership paths remain enforced.
+8. Validate trusted guard behavior for exact owner, Dependabot, forks, spoofed branches, divergence, renames, and workflow mutations.
+9. Validate source-only AI review checks out base code and fetches head as data without candidate execution.
 
-Fill a row when the surface exists. Each row needs a cold-start how-to and a smoke that an agent can re-run.
+## Commands
 
-| # | Surface | How an agent accesses it (cold) | Smoke | Status |
-|---|---------|--------------------------------|-------|--------|
-| 1 | Running instance + test accounts | `REPLACE_ME` | | ⬜ |
-| 2 | Seed + reset | `REPLACE_ME` | | ⬜ |
-| 3 | Database / direct query | `REPLACE_ME` | | ⬜ |
-| 4 | Side effects (email, jobs, webhooks) | Agent-queryable sink, not a live third party | | ⬜ |
+```bash
+bash scripts/setup-source.sh
+pnpm verify
+```
 
-## Swarm rules
+Generated repositories use:
 
-- Cloud singletons (prod DB, live keys, real third parties) belong to the integration lane. Feature agents verify against local oracles.
-- Local green ≠ deployed green. The deployed smoke is the oracle that counts.
+```bash
+bash scripts/setup.sh
+bash scripts/verify.sh --structure-only
+bash scripts/verify.sh
+```
 
-## Evidence by change kind
-
-- **Bug fix:** reproduce the failure before the change, then exercise the same path and observe that it no longer fails.
-- **Functional or API change:** run the repository gate, then exercise the changed contract through its real boundary.
-- **UI change:** use the running surface and verify interaction, loading, empty, error, permission, keyboard, and narrow-viewport behavior that the change can affect.
-- **Provider or infrastructure change:** verify both product state and the provider's real resource state, including cleanup.
-
-Compilation, types, lint, unit tests, mocks, and repository checks are necessary evidence where applicable. None substitutes for the product smoke.
+The default generated gate intentionally fails until product placeholders and the untouched example scenario are replaced.

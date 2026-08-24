@@ -1,0 +1,4 @@
+msrv = "1.98.0"
+allow-expect-in-tests = true
+allow-unwrap-in-tests = true
+avoid-breaking-exported-api = false

@@ -1,12 +1,10 @@
 # PR review — autonomous rule owners
 
-The production reviewer runs one independent DeepSeek session per active rule document. Base rules come from dynamically discovered `docs/rules/*.md` files; optional stack profiles join only when their repository marker exists. Each session owns the entire pull request under its assigned document and decides what repository evidence to inspect.
+The production reviewer runs one independent DeepSeek session per discovered rule document. The generator source owns every `docs/rules/*.md` and `docs/profiles/*.md`; ordinary repositories activate Rust from `Cargo.toml` and TypeScript from `package.json` plus `tsconfig.json`. Each session owns the whole pull request under its assigned document and decides what repository evidence to inspect.
 
 ## Architecture
 
-- `agents.mjs` discovers and sorts every rule document; there is no maintained
-  reviewer list.
-- `agents.mjs` also activates `docs/profiles/rust.md` when the repository root contains `Cargo.toml`; non-Rust repositories do not launch that session.
+- `agents.mjs` discovers and sorts rule documents; there is no maintained reviewer list. Generator source reviews both emitted profiles, while marker-based repositories load only active profiles.
 - `core.mjs` loads each document verbatim, configures Pi's native DeepSeek provider
   for `deepseek-v4-flash`, and owns the answer-volume contract: the shared prompt
   preamble bans narration, progress notes, and restating the rule document, and
@@ -30,15 +28,7 @@ The production reviewer runs one independent DeepSeek session per active rule do
 - `ci-review.mjs` launches the rule-owner sessions in parallel and passes their
   findings into the existing deterministic posting pipeline in `inline.mjs`.
 
-With the five current rule documents, the old production shape was up to
-`60 files × 5 rules × 3 samples = 900` stateless model requests. The new shape is
-exactly **five top-level whole-PR sessions**. A session can make model-directed
-continuations after tool calls, bounded by turn, tool-call, request, and wall-time
-limits; production never creates a model review per changed file. First measured
-production run: 14 changed files, five parallel sessions, 4–22 tool calls each,
-102 seconds end to end.
-
-A repository with `Cargo.toml` adds one Rust-profile session. A repository without Cargo retains the five-session shape and pays no Rust-review cost.
+The reviewer creates one top-level whole-PR session per discovered owner, never one model request per changed file. Sessions may make bounded model-directed continuations after tool calls; the active owner count is derived from the documents and profile markers rather than hard-coded.
 
 The launcher does not rank files, create clusters, prescribe traversal order, or
 encode a delegation workflow. Its only orchestration is independent rule-owner
@@ -185,16 +175,14 @@ anchored finding.
   best-effort GraphQL thread resolution only after a complete review. Bot-resolved
   findings that reappear post fresh.
 
-The GitHub Actions job uses `pull_request`, not `pull_request_target`. Fork PRs do
-not receive the DeepSeek secret or a write token. The job installs the pinned Pi
-runtime with lifecycle scripts disabled before launching the reviewers.
+The GitHub Actions job uses base-owned `pull_request_target` code. It checks out the exact base SHA, fetches `refs/pull/<number>/head` as an object without checking it out, verifies the event head SHA, and exposes head content only through bounded read-only repository tools. Candidate workflow/code never receives the DeepSeek secret or write token; validated output can post advisory review comments only.
 
 ## Verification
 
 All local reviewer tests are network-free:
 
 ```bash
-node --test tooling/pr-review/*.test.node.mjs
+node --test test/pr-review/*.test.mjs
 ```
 
 They cover dynamic one-session-per-rule launch over a 240-file index, multi-turn

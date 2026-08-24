@@ -5,13 +5,12 @@ updates:
     schedule:
       interval: weekly
     groups:
-      npm-dependencies:
+      npm:
         patterns: ["*"]
-
   - package-ecosystem: github-actions
     directory: /
     schedule:
       interval: weekly
     groups:
-      github-actions:
+      actions:
         patterns: ["*"]

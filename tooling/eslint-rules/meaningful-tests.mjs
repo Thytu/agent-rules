@@ -83,6 +83,21 @@ export const meaningfulTests = {
 					testStack.push({ node, expects: 0, nonCallExpects: 0 });
 					return;
 				}
+				const current = testStack[testStack.length - 1];
+				const directAssert =
+					node.callee.type === "Identifier" && node.callee.name === "assert";
+				const assertionMember =
+					node.callee.type === "MemberExpression" &&
+					node.callee.object.type === "Identifier" &&
+					(node.callee.object.name === "assert" ||
+						(node.callee.object.name === "ruleTester" &&
+							node.callee.property.type === "Identifier" &&
+							node.callee.property.name === "run"));
+				if (current && (directAssert || assertionMember)) {
+					current.expects += 1;
+					current.nonCallExpects += 1;
+					return;
+				}
 				if (
 					node.callee.type === "MemberExpression" &&
 					node.callee.object.type === "Identifier" &&
@@ -102,10 +117,11 @@ export const meaningfulTests = {
 				}
 				const chain = expectChain(node);
 				if (!chain) return;
-				const current = testStack[testStack.length - 1];
-				if (current) {
-					current.expects += 1;
-					if (!CALL_MATCHERS.has(chain.matcher)) current.nonCallExpects += 1;
+				const currentExpectation = testStack[testStack.length - 1];
+				if (currentExpectation) {
+					currentExpectation.expects += 1;
+					if (!CALL_MATCHERS.has(chain.matcher))
+						currentExpectation.nonCallExpects += 1;
 				}
 				if (
 					chain.matcher === "toMatchSnapshot" ||

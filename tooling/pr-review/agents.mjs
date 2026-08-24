@@ -23,8 +23,22 @@ export function loadAgents(root = REPO_ROOT) {
 			doc: `docs/rules/${file}`,
 		}));
 
-	if (existsSync(join(root, "Cargo.toml"))) {
-		agents.push({ id: "rust", doc: "docs/profiles/rust.md" });
+	const profiles = new Set();
+	if (existsSync(join(root, "init.sh"))) {
+		for (const file of readdirSync(join(root, "docs", "profiles"))) {
+			if (file.endsWith(".md")) profiles.add(file.replace(/\.md$/, ""));
+		}
+	} else {
+		if (existsSync(join(root, "Cargo.toml"))) profiles.add("rust");
+		if (
+			existsSync(join(root, "package.json")) &&
+			existsSync(join(root, "tsconfig.json"))
+		) {
+			profiles.add("typescript");
+		}
+	}
+	for (const profile of profiles) {
+		agents.push({ id: profile, doc: `docs/profiles/${profile}.md` });
 	}
 
 	return agents.sort((left, right) => left.id.localeCompare(right.id));

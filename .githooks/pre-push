@@ -1,0 +1,6 @@
+#!/usr/bin/env bash
+set -euo pipefail
+root="$(git rev-parse --show-toplevel)"
+bash "$root/template/core/files/scripts/guard-append-only.sh" force-push
+cd "$root"
+pnpm verify

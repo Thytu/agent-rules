@@ -1,19 +1,17 @@
-## Decision record
+# Pull request
 
-The branch dies at squash-merge. Every decision made on it lives here — if it
-isn't in this body, it's gone.
+## Decision
 
--
+What changed and why is this the smallest complete solution?
 
-## Scenarios walked
+## User outcome
 
-Re-walk every scenario whose `touches:` names a changed artifact. Concrete
-artifact per step, not a mechanism name.
+What can a repository owner now do or observe?
 
-- none
+## Verification
 
-## Verify
+List the exact source gate, generated modes, and behavior exercised.
 
-What you ran against the real thing.
+## Risks
 
--
+Name migration, security, rollback, compatibility, or operational risks and their bounds.

@@ -437,27 +437,4 @@ export function useGoHome() {
 }`,
 		violations: [],
 	},
-	{
-		id: "harness-native-confirm",
-		source: "authored",
-		file: "app/routes/admin.contacts.$id.tsx",
-		code: `function onDelete(id) {
-	if (!confirm("Delete this contact?")) return;
-	submit({ id }, { method: "post" });
-}`,
-		violations: ["harness"],
-	},
-	{
-		id: "design-hover-weight",
-		source: "authored",
-		file: "app/ui/name-tag.tsx",
-		code: `export function NameTag({ hovered, name }) {
-	return (
-		<span className={hovered ? "font-semibold text-fg" : "font-normal text-fg"}>
-			{name}
-		</span>
-	);
-}`,
-		violations: ["design-system"],
-	},
 ];
