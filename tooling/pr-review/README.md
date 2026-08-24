@@ -238,6 +238,11 @@ runs each) measured reasoning off at P=63.9%, R=95.8%, F1=76.7% and high at
 P=66.7%, R=100%, F1=80.0%. This supports the high-reasoning default but is not a
 replacement for a complete development or holdout run.
 
+The first complete high-reasoning run over the corrected repositories measured
+development at P=26.7%, R=100%, F1=42.2% and holdout at P=26.1%, R=100%,
+F1=41.4%. These replace the earlier one-file scores; they still show that
+owner-scope false positives, not missed violations, dominate.
+
 The evaluator prints micro and per-owner precision, recall, and F1. Development
 cases are available while tuning; holdout cases remain separate to expose
 overfitting. Results are a baseline only when every owner completes.
