@@ -48,13 +48,11 @@ copy_tree "$root/template/core/files" "$out"
 mkdir -p "$out/docs/rules" "$out/docs/profiles"
 cp -a "$root/docs/rules/." "$out/docs/rules/"
 fragments=("$root/template/core/gitignore.entries")
-dependabot=("$root/template/core/dependabot.update.yml")
 
 if [[ ",$selection," == *,rust,* ]]; then
 	copy_tree "$root/template/rust/files" "$out"
 	cp -a "$root/docs/profiles/rust.md" "$out/docs/profiles/rust.md"
 	fragments+=("$root/template/rust/gitignore.entries")
-	dependabot+=("$root/template/rust/dependabot.update.yml")
 fi
 if [[ ",$selection," == *,typescript,* ]]; then
 	copy_tree "$root/template/typescript/files" "$out"
@@ -62,12 +60,9 @@ if [[ ",$selection," == *,typescript,* ]]; then
 	copy_tree "$root/test/eslint" "$out/test/eslint"
 	cp -a "$root/docs/profiles/typescript.md" "$out/docs/profiles/typescript.md"
 	fragments+=("$root/template/typescript/gitignore.entries")
-	dependabot+=("$root/template/typescript/dependabot.update.yml")
 fi
 
 awk '!seen[$0]++' "${fragments[@]}" > "$out/.gitignore"
-mkdir -p "$out/.github"
-cat "${dependabot[@]}" > "$out/.github/dependabot.yml"
 
 "$out/scripts/setup.sh" --structure-only --tools-dir "$tools"
 ACTIONLINT_BIN="$tools/actionlint" "$out/scripts/verify.sh" --structure-only

@@ -23,7 +23,7 @@ After initialization:
 1. Fill `SCOPE.md`, `docs/rules/tech-stack.md`, `VERIFICATION.md`, and real scenarios.
 2. Run `bash scripts/verify.sh`.
 3. Commit the initialized product repository.
-4. Run `bash scripts/setup-github.sh` to install repository settings and required checks.
+4. Run `bash scripts/setup-github.sh` to install repository settings, required checks, and vulnerability alerts without scheduled dependency-update pull requests.
 
 ## Develop the generator
 

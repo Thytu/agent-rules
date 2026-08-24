@@ -26,8 +26,8 @@ touches:
     - tooling/pr-review/
     - .agents/skills/
     - .claude/skills
-    - .github/dependabot.yml
     - .github/PULL_REQUEST_TEMPLATE.md
+    - .github/dependabot.yml
     - .github/workflows/ci.yml
     - .github/workflows/guard.yml
     - .github/workflows/ai-review.yml
@@ -67,3 +67,16 @@ scenarios:
     success_signals:
       - Bytes, modes, symlinks, index, and all original entries are restored; generated extras are absent.
       - "EXPERIENCE: failure is explicit and the repository remains immediately usable."
+  - id: INIT-S4
+    name: Configure low-noise dependency security
+    persona: repository owner
+    steps: |
+      1. Run bash scripts/setup-github.sh against the materialized repository.
+      2. Inspect its GitHub dependency-security settings and generated tree.
+      3. Opt in to automatic security pull requests and rerun setup-github.sh.
+      4. Inspect the dependency-security settings again.
+    success_signals:
+      - Vulnerability alerts and the dependency graph are enabled.
+      - The first setup disables automatic security pull requests, and no scheduled Dependabot version-update configuration is emitted.
+      - A later setup rerun preserves the repository owner's explicit automatic-security-pull-request preference.
+      - "EXPERIENCE: the owner receives security signal without a recurring dependency pull-request queue."

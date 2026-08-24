@@ -1,17 +1,29 @@
 # Pull request
 
+> **Outcome:** <!-- One sentence describing what a repository owner can now do or observe. -->
+
 ## Decision
 
-What changed and why is this the smallest complete solution?
+<!-- Use one to three short paragraphs. Describe behavior and rationale, never file paths. -->
 
-## User outcome
+| Surface or contract | Before | After |
+|---|---|---|
+| <!-- Name the behavior, schema, or procedure. --> | <!-- Previous state. --> | <!-- New state. --> |
 
-What can a repository owner now do or observe?
+---
 
 ## Verification
 
-List the exact source gate, generated modes, and behavior exercised.
+| Procedure | Evidence |
+|---|---|
+| Source gate | <!-- Exact command and observed result. --> |
+| Generated modes | <!-- Modes exercised and their observed results. --> |
+| Repository-owner behavior | <!-- Real workflow exercised end to end. --> |
+
+---
 
 ## Risks
 
-Name migration, security, rollback, compatibility, or operational risks and their bounds.
+| Risk | Bound |
+|---|---|
+| <!-- Migration, security, compatibility, or operations. --> | <!-- Prevention, containment, or recovery. --> |

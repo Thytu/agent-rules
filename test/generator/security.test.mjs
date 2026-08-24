@@ -35,6 +35,31 @@ function authorize(t, paths, env) {
 	);
 }
 
+test("pull request templates require visual behavior summaries", () => {
+	const templates = [
+		readFileSync(join(root, ".github", "PULL_REQUEST_TEMPLATE.md"), "utf8"),
+		readFileSync(
+			join(
+				root,
+				"template",
+				"core",
+				"files",
+				".github",
+				"PULL_REQUEST_TEMPLATE.md",
+			),
+			"utf8",
+		),
+	];
+	for (const template of templates) {
+		assert.match(template, /> \*\*Outcome:\*\*/);
+		assert.match(template, /\| Surface or contract \| Before \| After \|/);
+		assert.match(template, /\| Procedure \| Evidence \|/);
+		assert.match(template, /\| Risk \| Bound \|/);
+		assert.match(template, /^---$/m);
+		assert.match(template, /never file paths/);
+	}
+});
+
 test("only the exact integration owner may change policy", (t) => {
 	const owner = authorize(t, [".github/workflows/ci.yml"], {
 		ACTOR: "owner",
@@ -49,7 +74,7 @@ test("only the exact integration owner may change policy", (t) => {
 	assert.match(spoof.stderr, /unauthorized integration-owned source path/);
 });
 
-test("Dependabot is limited to manifest and lock changes", (t) => {
+test("opt-in Dependabot remediation is limited to manifests and locks", (t) => {
 	const allowed = authorize(t, ["package.json", "pnpm-lock.yaml"], {
 		ACTOR: "dependabot[bot]",
 		HEAD_REF: "dependabot/npm/update",

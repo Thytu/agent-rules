@@ -33,6 +33,7 @@ check_workflows() {
 if [ "$mode" = source ]; then
 	for path in AGENTS.md CLAUDE.md SCOPE.md VERIFICATION.md README.md init.sh package.json pnpm-lock.yaml .agents/skills docs/rules docs/profiles docs/scenarios/01-init.yaml template/core/files/scripts/verify.sh template/rust/files template/typescript/files test/generator tooling/pr-review .github/workflows/ci.yml .github/workflows/guard.yml .github/workflows/ai-review.yml; do require "$path"; done
 	[ ! -e "$root/scripts/check-map.sh" ] || fail "legacy check-map.sh must be removed"
+	for path in .github/dependabot.yml template/core/dependabot.update.yml template/rust/dependabot.update.yml template/typescript/dependabot.update.yml; do [ ! -e "$root/$path" ] || fail "scheduled Dependabot configuration must be absent: $path"; done
 	check_map "$root/AGENTS.md"
 	check_workflows
 	exit 0
@@ -45,9 +46,6 @@ check_workflows
 [ -x "$root/.githooks/pre-commit" ] || fail "pre-commit hook is not executable"
 [ -x "$root/.githooks/pre-push" ] || fail "pre-push hook is not executable"
 [ -x "$root/scripts/setup.sh" ] || fail "setup.sh is not executable"
-[ -s "$root/.github/dependabot.yml" ] || fail "Dependabot config missing"
-grep -q '^version: 2$' "$root/.github/dependabot.yml" || fail "Dependabot version header invalid"
-grep -q '^updates:$' "$root/.github/dependabot.yml" || fail "Dependabot updates header invalid"
 
 if [ -f "$root/Cargo.toml" ]; then require docs/profiles/rust.md; require scripts/verify-rust.sh; else
 	for path in Cargo.toml Cargo.lock rust-toolchain.toml rustfmt.toml clippy.toml deny.toml .cargo scripts/setup-rust.sh scripts/verify-rust.sh docs/profiles/rust.md; do [ ! -e "$root/$path" ] || fail "unselected Rust path exists: $path"; done

@@ -12,7 +12,6 @@
 .githooks/prepare-commit-msg
 .github/
 .github/PULL_REQUEST_TEMPLATE.md
-.github/dependabot.yml
 .github/workflows/
 .github/workflows/ci.yml
 .github/workflows/guard.yml

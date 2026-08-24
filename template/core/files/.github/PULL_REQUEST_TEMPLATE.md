@@ -1,17 +1,28 @@
 # Pull request
 
+> **Outcome:** <!-- One sentence describing what a user can now do or observe. -->
+
 ## Decision
 
-What changed and why is this the smallest complete solution?
+<!-- Use one to three short paragraphs. Describe behavior and rationale, never file paths. -->
 
-## User outcome
+| Surface or contract | Before | After |
+|---|---|---|
+| <!-- Name the behavior, schema, or procedure. --> | <!-- Previous state. --> | <!-- New state. --> |
 
-What can a user now do or observe?
+---
 
 ## Verification
 
-List the exact repository gate and real behavior exercised.
+| Procedure | Evidence |
+|---|---|
+| Repository gate | <!-- Exact command and observed result. --> |
+| User behavior | <!-- Real workflow exercised end to end. --> |
+
+---
 
 ## Risks
 
-Name migration, security, compatibility, or operational risks and how they are bounded.
+| Risk | Bound |
+|---|---|
+| <!-- Migration, security, compatibility, or operations. --> | <!-- Prevention, containment, or recovery. --> |

@@ -110,6 +110,64 @@ function snapshot(root) {
 	return hash.digest("hex");
 }
 
+function exerciseGitHubSetup(root, temp) {
+	const bin = join(temp, "github-bin");
+	const state = join(temp, "github-state");
+	const log = join(temp, "gh.log");
+	const gh = join(bin, "gh");
+	const alerts = join(state, "vulnerability-alerts");
+	const securityFixes = join(state, "automated-security-fixes");
+	mkdirSync(bin);
+	mkdirSync(state);
+	writeFileSync(securityFixes, "enabled\n");
+	writeFileSync(
+		gh,
+		`#!/usr/bin/env bash
+set -euo pipefail
+printf '%s\n' "$*" >> "$GH_LOG"
+case "$*" in
+	"repo view --json nameWithOwner --jq .nameWithOwner") printf 'org/repo\n' ;;
+	"api user --jq .login") printf 'owner\n' ;;
+	"variable list --repo org/repo --json name --jq .[].name")
+		if [ -e "$GH_STATE/integration-owner" ]; then printf 'INTEGRATION_OWNER\n'; fi
+		;;
+	"variable set INTEGRATION_OWNER --repo org/repo --body owner") touch "$GH_STATE/integration-owner" ;;
+	"api -X PUT repos/org/repo/vulnerability-alerts") printf 'enabled\n' > "$GH_STATE/vulnerability-alerts" ;;
+	"api -X DELETE repos/org/repo/automated-security-fixes") printf 'disabled\n' > "$GH_STATE/automated-security-fixes" ;;
+	"api repos/org/repo/rulesets") printf '[]\n' ;;
+esac
+case " $* " in *" --input - "*) cat >/dev/null ;; esac
+`,
+	);
+	chmodSync(gh, 0o755);
+	const options = {
+		cwd: root,
+		encoding: "utf8",
+		env: {
+			...process.env,
+			GH_LOG: log,
+			GH_STATE: state,
+			PATH: `${bin}:${inheritedPath}`,
+		},
+	};
+	const initial = execFileSync("bash", ["scripts/setup-github.sh"], options);
+	assert.equal(readFileSync(alerts, "utf8"), "enabled\n");
+	assert.equal(readFileSync(securityFixes, "utf8"), "disabled\n");
+	writeFileSync(securityFixes, "enabled\n");
+	const rerun = execFileSync("bash", ["scripts/setup-github.sh"], options);
+	assert.equal(readFileSync(securityFixes, "utf8"), "enabled\n");
+	assert.equal(
+		(
+			readFileSync(log, "utf8").match(
+				/^api -X DELETE repos\/org\/repo\/automated-security-fixes$/gm,
+			) ?? []
+		).length,
+		1,
+	);
+	assert.match(initial, /automated security pull requests disabled/);
+	assert.match(rerun, /security pull-request preference preserved/);
+}
+
 for (const mode of ["rust", "typescript", "rust,typescript"]) {
 	test(`materializes and exercises ${mode}`, { timeout: 20 * 60_000 }, (t) => {
 		const { root, temp } = repository(t);
@@ -136,6 +194,24 @@ for (const mode of ["rust", "typescript", "rust,typescript"]) {
 			lstatSync(join(root, "init.sh"), { throwIfNoEntry: false }),
 			undefined,
 		);
+		assert.equal(
+			lstatSync(join(root, ".github", "dependabot.yml"), {
+				throwIfNoEntry: false,
+			}),
+			undefined,
+		);
+		const pullRequestTemplate = readFileSync(
+			join(root, ".github", "PULL_REQUEST_TEMPLATE.md"),
+			"utf8",
+		);
+		assert.match(pullRequestTemplate, /> \*\*Outcome:\*\*/);
+		assert.match(
+			pullRequestTemplate,
+			/\| Surface or contract \| Before \| After \|/,
+		);
+		assert.match(pullRequestTemplate, /\| Procedure \| Evidence \|/);
+		assert.match(pullRequestTemplate, /\| Risk \| Bound \|/);
+		exerciseGitHubSetup(root, temp);
 		const actual = `${paths(root).join("\n")}\n`;
 		const golden = join(
 			sourceRoot,
@@ -146,6 +222,10 @@ for (const mode of ["rust", "typescript", "rust,typescript"]) {
 		);
 		if (process.env.UPDATE_GOLDENS === "1") writeFileSync(golden, actual);
 		else assert.equal(actual, readFileSync(golden, "utf8"));
+		writeFileSync(
+			join(root, ".github", "dependabot.yml"),
+			"version: 2\nupdates:\n  - package-ecosystem: github-actions\n    directory: /\n    schedule:\n      interval: monthly\n",
+		);
 		mkdirSync(join(root, "app"), { recursive: true });
 		writeFileSync(join(root, "app", "product.txt"), "product-owned\n");
 		if (mode === "rust") {
