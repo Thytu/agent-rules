@@ -11,7 +11,6 @@ Build production software a real user runs. Cuts come only from `SCOPE.md`. Unha
 | Topic | Read when | Where |
 |---|---|---|
 | What to build | starting any feature | `SCOPE.md` |
-| Definition of done | before and after building | `docs/scenarios/` |
 | Language profiles | writing language-specific code | `docs/profiles/` |
 | House conventions | writing code or tests | `docs/rules/engineering.md` |
 | Git, ownership, and sequencing | changing shared files or workflow | `docs/rules/process.md` |

@@ -11,7 +11,6 @@ Build production software a real user runs. Cuts come only from `SCOPE.md`. Unha
 | Topic | Read when | Where |
 |---|---|---|
 | Generator product | changing initialization or templates | `SCOPE.md` |
-| Generator scenarios | before and after changing output | `docs/scenarios/` |
 | Core engineering rules | changing emitted rules | `docs/rules/` |
 | Generated language profiles | changing Rust or TypeScript output | `docs/profiles/` |
 | Reusable agent workflows | creating PRs, RCA, judge loops, or headless lanes | `.agents/skills/` |

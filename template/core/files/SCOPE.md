@@ -6,7 +6,7 @@
 
 What this is, who it is for, and the quality bar that outranks a demo, ticket, or evaluator.
 
-Cuts are authorized only here or in `docs/scenarios/GAP-REGISTER.md`.
+Cuts are authorized only here.
 
 ## In scope
 

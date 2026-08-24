@@ -244,10 +244,7 @@ for (const mode of ["rust", "typescript", "rust,typescript"]) {
 			env: process.env,
 		});
 		assert.notEqual(incomplete.status, 0);
-		assert.match(
-			`${incomplete.stdout}${incomplete.stderr}`,
-			/replace the example scenario|REPLACE_ME/,
-		);
+		assert.match(`${incomplete.stdout}${incomplete.stderr}`, /REPLACE_ME/);
 		if (mode === "rust,typescript") {
 			writeFileSync(
 				join(root, "SCOPE.md"),
@@ -256,11 +253,6 @@ for (const mode of ["rust", "typescript", "rust,typescript"]) {
 			writeFileSync(
 				join(root, "VERIFICATION.md"),
 				"# Verification\n\nRun the product smoke at its real boundary.\n",
-			);
-			rmSync(join(root, "docs", "scenarios", "00-example.yaml"));
-			writeFileSync(
-				join(root, "docs", "scenarios", "01-product.yaml"),
-				"module: product\ntouches:\n  files: []\n  tables: []\n  ports: []\n  routes: []\nscenarios:\n  - id: PRODUCT-S1\n    name: Product smoke\n    persona: user\n    steps: |\n      1. Exercise the real product boundary.\n    success_signals:\n      - Observe the product result.\n      - 'EXPERIENCE: the user sees the completed result.'\n",
 			);
 			mkdirSync(join(root, "test", "product"), { recursive: true });
 			writeFileSync(

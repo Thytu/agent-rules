@@ -12,11 +12,10 @@ bash scripts/verify.sh --structure-only
 Then:
 
 1. Define the product in `SCOPE.md`.
-2. Replace `docs/scenarios/00-example.yaml` with real scenarios.
-3. Fill `VERIFICATION.md` with runnable product access and smoke paths.
-4. Run `bash scripts/verify.sh`.
-5. Make the first passing commit.
-6. Run `bash scripts/setup-github.sh`.
+2. Fill `VERIFICATION.md` with runnable product access and smoke paths.
+3. Run `bash scripts/verify.sh`.
+4. Make the first passing commit.
+5. Run `bash scripts/setup-github.sh`.
 
 ## Stable commands
 

@@ -21,4 +21,4 @@ A new repository owner chooses Rust, TypeScript, or both and receives one clean,
 - Emitting the AI reviewer or any model credential/runtime.
 - Scheduled dependency-version pull requests; product owners may opt in after materialization.
 
-Cuts are authorized only here or in `docs/scenarios/GAP-REGISTER.md`.
+Cuts are authorized only here.

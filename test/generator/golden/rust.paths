@@ -31,10 +31,6 @@ docs/profiles/rust.md
 docs/rules/
 docs/rules/engineering.md
 docs/rules/process.md
-docs/scenarios/
-docs/scenarios/00-example.yaml
-docs/scenarios/GAP-REGISTER.md
-docs/scenarios/README.md
 rust-toolchain.toml
 rustfmt.toml
 scripts/
