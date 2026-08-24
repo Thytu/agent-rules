@@ -4,6 +4,7 @@
 .agent-rules/guarded-paths/*
 AGENTS.md
 CLAUDE.md
+README.md
 docs/rules/*
 scripts/setup.sh
 scripts/setup-github.sh

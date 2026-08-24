@@ -13,7 +13,7 @@ lists=("$root/.agent-rules/guarded-paths"/*.txt)
 
 matches=0
 while IFS= read -r -d '' path; do
-	[ "$mode" = source ] && case "$path" in init.sh|template/*|.agents/*|.claude/*|package.json|pnpm-lock.yaml|.github/*|scripts/setup-source.sh|scripts/setup-github.sh|docs/rules/*) matches=1 ;; esac
+	[ "$mode" = source ] && case "$path" in README.md|init.sh|template/*|.agents/*|.claude/*|package.json|pnpm-lock.yaml|.github/*|scripts/setup-source.sh|scripts/setup-github.sh|docs/rules/*) matches=1 ;; esac
 	for list in "${lists[@]}"; do
 		[ -f "$list" ] || continue
 		while IFS= read -r pattern; do

@@ -73,6 +73,14 @@ test("only the exact integration owner may change policy", (t) => {
 	assert.notEqual(spoof.status, 0);
 	assert.match(spoof.stderr, /unauthorized integration-owned source path/);
 });
+test("source workflow policy requires integration ownership", (t) => {
+	const workflowPolicy = authorize(t, ["README.md"], {});
+	assert.notEqual(workflowPolicy.status, 0);
+	assert.match(
+		workflowPolicy.stderr,
+		/unauthorized integration-owned source path/,
+	);
+});
 
 test("opt-in Dependabot remediation is limited to manifests and locks", (t) => {
 	const allowed = authorize(t, ["package.json", "pnpm-lock.yaml"], {
