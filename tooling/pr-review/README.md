@@ -5,15 +5,15 @@ The source reviewer runs exactly eight independent owner reviews, one per top-le
 ## Architecture
 
 - `agents.mjs` discovers and sorts the eight top-level rule documents and fails if the count differs from the declared budget. There are no profile reviewers or marker stubs.
-- `core.mjs` loads each document verbatim, configures Pi's native DeepSeek provider
-  for `deepseek-v4-flash`, and owns the answer-volume contract: the shared prompt
-  preamble bans narration, progress notes, and restating the rule document, and
-  `FINDING_LIMITS` fixes the per-field size of a finding. Reading is free; only
-  writing spends the budget. `RESPONSE_CEILING` is the output ceiling every request
-  asks for, derived from that contract rather than chosen: no response carries more
-  than `SUBMISSIONS_PER_RESPONSE` findings of at most `FINDING_LIMITS` each, doubled
-  to leave the model room for its own words. A model whose own ceiling is lower is
-  asked for that instead.
+- `core.mjs` loads each document verbatim and configures Pi's native DeepSeek
+  provider for `deepseek-v4-flash`. `FINDING_LIMITS` bounds what reaches GitHub;
+  oversized tool arguments are clamped at submission. Requests use the model
+  catalog's explicit `maxTokens` ceiling rather than a smaller derived token
+  budget, so a valid multi-tool response is not truncated. Cost is bounded by
+  the shared 15-minute deadline, 60-turn and 200-tool ceilings, and at most
+  `SUBMISSIONS_PER_RESPONSE` recorded findings per response—not by a separate
+  `RESPONSE_CEILING`.
+
 - `agent.mjs` gives each rule owner its own `@earendil-works/pi-agent-core`
   `Agent`. Its initial context is a compact changed-file index (status, path,
   rename, and line counts), never concatenated diffs. Pi owns the persistent

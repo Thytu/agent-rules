@@ -357,8 +357,8 @@ async function runRuleReviewerSession({
 			}
 			if (toolCall.name !== SUBMIT_TOOL) return undefined;
 			// Refused, not fatal: the reviewer is told to re-issue it, and the next
-			// response is a fresh allowance. This is the cap RESPONSE_CEILING is
-			// derived from, which is why it is enforced rather than merely asked for.
+			// response is a fresh allowance. This cap bounds recorded findings per
+			// response; the request itself uses the model catalog's token ceiling.
 			const used = (submissionsPerResponse.get(assistantMessage) ?? 0) + 1;
 			submissionsPerResponse.set(assistantMessage, used);
 			if (used <= limits.maxSubmissionsPerResponse) return undefined;
