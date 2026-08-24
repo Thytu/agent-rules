@@ -131,8 +131,8 @@ test("real holdout changes preserve full source and narrow diffs", () => {
 			`${fixture.id} has no real base file`,
 		);
 		assert.ok(
-			Object.keys(fixture.repository.head).length >= 50,
-			`${fixture.id} lacks its real source dependency closure`,
+			Object.keys(fixture.repository.head).length >= 700,
+			`${fixture.id} lacks its complete real repository context`,
 		);
 		const repository = createFixtureRepository(fixture);
 		const change = repository.changes[0];

@@ -5,10 +5,10 @@ import { OPENROSTRUM_FILES } from "./openrostrum-snapshot.mjs";
 // the doctrine: the prompt must not be edited in reaction to any failure here.
 //
 // Two kinds:
-//  - source:"real" exposes a complete OpenRostrum source file plus its real
-//    transitive local imports, package manifest, lockfile, and configuration.
-//    Most are clean: legitimate WHY comments, regression tests, and sanctioned
-//    throws from a doctrine-compliant production repository.
+//  - source:"real" exposes a complete OpenRostrum source file plus the full
+//    tracked text repository: definitions, reverse callers, tests, documents,
+//    package manifest, lockfile, workflows, and configuration. Most are clean:
+//    legitimate WHY comments, regression tests, and sanctioned throws.
 //  - source:"authored" adds a complete changed module to the shared multi-file
 //    fixture application. Its positives use surfaces unlike the development set.
 //
