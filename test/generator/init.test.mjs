@@ -264,18 +264,12 @@ for (const mode of ["rust", "typescript", "rust,typescript"]) {
 			cwd: root,
 			env: isolatedEnvironment,
 		});
-		const incomplete = spawnSync("bash", ["scripts/verify.sh"], {
+		execFileSync("bash", ["scripts/verify.sh"], {
 			cwd: root,
-			encoding: "utf8",
 			env: isolatedEnvironment,
+			stdio: isolatedEnvironment.DEBUG_INIT === "1" ? "inherit" : undefined,
 		});
-		assert.notEqual(incomplete.status, 0);
-		assert.match(`${incomplete.stdout}${incomplete.stderr}`, /REPLACE_ME/);
 		if (mode === "rust,typescript") {
-			writeFileSync(
-				join(root, "VERIFICATION.md"),
-				"# Verification\n\nRun the product smoke at its real boundary.\n",
-			);
 			mkdirSync(join(root, "test", "product"), { recursive: true });
 			writeFileSync(
 				join(root, "test", "product", "value.test.ts"),

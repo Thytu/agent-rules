@@ -11,10 +11,9 @@ bash scripts/verify.sh --structure-only
 
 Then:
 
-1. Fill `VERIFICATION.md` with runnable product access and smoke paths.
-2. Run `bash scripts/verify.sh`.
-3. Make the first passing commit.
-4. Run `bash scripts/setup-github.sh`.
+1. Run `bash scripts/verify.sh`.
+2. Make the first passing commit.
+3. Run `bash scripts/setup-github.sh`.
 
 ## Repository workflow
 
@@ -25,7 +24,7 @@ Everything lands by squash merge and the branch is deleted. The pull-request des
 ## Stable commands
 
 - `bash scripts/setup.sh` — install pinned selected tooling and hooks.
-- `bash scripts/verify.sh --structure-only` — verify repository infrastructure while product contracts are unfinished.
-- `bash scripts/verify.sh` — complete repository and product-contract gate.
+- `bash scripts/verify.sh --structure-only` — verify repository infrastructure without running the selected language gates.
+- `bash scripts/verify.sh` — complete repository and selected-language gate.
 
 Selected runtime details live in manifests and configuration; `AGENTS.md` routes each task to the exact rule or verifier.

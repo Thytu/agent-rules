@@ -26,7 +26,6 @@ Build production software a real user runs. Do not cut requested behavior withou
 | Root-cause analysis | investigating a failure | `.agents/skills/root-cause/SKILL.md` |
 | Judge loops | challenging a plan or diff | `.agents/skills/judge-loop/SKILL.md` |
 | Headless lanes | delegating autonomous implementation | `.agents/skills/running-headless-lanes/SKILL.md` |
-| Generator verification | before claiming done | `VERIFICATION.md` |
 | Rule-owner review | changing reviewer behavior | `tooling/pr-review/README.md` |
 
 ## Commands

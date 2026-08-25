@@ -20,7 +20,6 @@ Build production software a real user runs. Do not cut requested behavior withou
 | Dependency integrity | changing dependencies, tools, runtimes, or pins | `docs/rules/dependency-integrity.md` |
 <!-- LANGUAGE_ROWS -->
 | Repository workflow | before committing, synchronizing, or preparing a pull request | `README.md` |
-| How to self-verify | before claiming done | `VERIFICATION.md` |
 
 ## Commands
 
