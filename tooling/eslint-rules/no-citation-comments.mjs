@@ -3,14 +3,14 @@
 // Mappings live in docs/eval-crosswalk.md, never in code. See
 // docs/rules/comments.md.
 const CITATION =
-	/SCOPE\.md|SCOPE\s+P[0-2]|\bP[0-2]\s*#\d|eval[- ]kit|\b(CFP|ABS|SPK|CNT|AIA|EMB|CRM)-\d{2}\b/;
+	/\bP[0-2]\s*#\d|eval[- ]kit|\b(CFP|ABS|SPK|CNT|AIA|EMB|CRM)-\d{2}\b/;
 
 export const noCitationComments = {
 	meta: {
 		type: "problem",
 		docs: {
 			description:
-				"Code comments must not cite SCOPE tiers or eval-kit rubric IDs — state the constraint directly.",
+				"Code comments must not cite planning tiers or evaluation rubric IDs — state the constraint directly.",
 		},
 		schema: [],
 		messages: {

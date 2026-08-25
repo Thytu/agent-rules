@@ -19,7 +19,6 @@ CLAUDE.md
 Cargo.lock
 Cargo.toml
 README.md
-SCOPE.md
 VERIFICATION.md
 biome.json
 clippy.toml

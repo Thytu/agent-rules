@@ -4,13 +4,12 @@ This file is the only agent-facing index. Vendor filenames are pointer shims, ne
 
 ## The lens
 
-Build production software a real user runs. Cuts come only from `SCOPE.md`. Unhappy paths, real scale, and empty/error/permission states are in scope.
+Build production software a real user runs. Do not cut requested behavior without explicit approval. Unhappy paths, real scale, and empty/error/permission states are in scope.
 
 ## The map
 
 | Topic | Read when | Where |
 |---|---|---|
-| What to build | starting any feature | `SCOPE.md` |
 | Boundary modeling and failures | changing input, output, types, adapters, or errors | `docs/rules/boundaries.md` |
 | Authorization and persistence | changing a callable read, mutation, query, or stored data | `docs/rules/authorization-persistence.md` |
 | Lifecycle and capacity | changing tasks, resources, retries, queues, or previews | `docs/rules/lifecycle-capacity.md` |

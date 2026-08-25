@@ -8,4 +8,4 @@ Apply this owner when changed production code leaves required behavior unimpleme
 
 Implement one complete contract. Do not leave TODO implementations, unconditional no-op substitutes, compatibility shims, deprecated aliases, parallel V2 paths, policy-only placeholders, or comments promising later behavior or cleanup. Catching or propagating an operational failure belongs to the boundary and lifecycle owners, not contract evolution. An explicit failure for unavailable configuration or unsupported behavior is complete. A deliberately disabled environment that returns an explicit non-success `skipped` outcome is also complete.
 
-A scope cut is recorded in `SCOPE.md`, and the unavailable path fails explicitly. Change a contract by migrating every caller and deleting the old path in the same change. Compatibility at an uncontrolled external boundary requires an owner-approved specification.
+A scope cut requires explicit owner approval, and the unavailable path fails explicitly. Change a contract by migrating every caller and deleting the old path in the same change. Compatibility at an uncontrolled external boundary requires an owner-approved specification.

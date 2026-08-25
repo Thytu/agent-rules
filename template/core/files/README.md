@@ -11,11 +11,10 @@ bash scripts/verify.sh --structure-only
 
 Then:
 
-1. Define the product in `SCOPE.md`.
-2. Fill `VERIFICATION.md` with runnable product access and smoke paths.
-3. Run `bash scripts/verify.sh`.
-4. Make the first passing commit.
-5. Run `bash scripts/setup-github.sh`.
+1. Fill `VERIFICATION.md` with runnable product access and smoke paths.
+2. Run `bash scripts/verify.sh`.
+3. Make the first passing commit.
+4. Run `bash scripts/setup-github.sh`.
 
 ## Repository workflow
 

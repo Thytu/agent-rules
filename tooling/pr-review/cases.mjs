@@ -26,7 +26,7 @@ export const MAX_UPLOAD_MB = 25;`,
 	{
 		id: "bs-tier-citation",
 		file: "app/lib/speakers.ts",
-		code: `// implements SCOPE P1 #16 (public widgets), see eval-crosswalk EMB-04
+		code: `// implements product tier P1 #16 (public widgets), see eval-crosswalk EMB-04
 export function loadSpeakers(db, eventId) {
 	return db.select().from(contacts).where(eq(contacts.eventId, eventId));
 }`,

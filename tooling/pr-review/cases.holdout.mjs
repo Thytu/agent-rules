@@ -205,8 +205,8 @@ export function toTracks(input: Track | readonly Track[]): readonly Track[] {
 		id: "real-bs-capabilities",
 		source: "real",
 		file: "app/marketing/content.ts",
-		code: `// The nine capabilities the product actually ships (SCOPE's six firm
-// requirements + the three that set it apart). Copy stays concrete: what an
+		code: `// The nine capabilities the product actually ships: six firm requirements
+// plus three that set it apart. Copy stays concrete: what an
 // organizer can do, not adjectives.
 export const FEATURES = [
 	{ icon: "inbox", title: "Custom call for speakers" },

@@ -10,8 +10,8 @@ The source gate is `pnpm verify`. It must prove the materializer and every emitt
 4. Exercise the selected language verifier in each mode.
 5. Prove unselected runtimes, configs, dependencies, commands, and prose are absent.
 6. Prove invalid mode, dirty/staged/untracked/ignored input, collision, hostile Git environment, and injected copy failure leave the original checkout byte/mode/symlink identical.
-7. Prove product paths added after initialization are permitted while generator, unselected, and guarded ownership paths remain enforced.
-8. Validate initial GitHub setup enables vulnerability alerts and disables automatic security pull requests, later setup reruns preserve the owner's explicit preference, and optional Dependabot remediation remains limited to manifests and locks.
+7. Prove generated output omits generator and unselected runtime files while accepting ordinary product paths.
+8. Validate GitHub setup enables vulnerability alerts, preserves the repository's automated security pull-request preference, and requires only the main-target and repository-quality checks.
 9. Validate source-only AI review checks out base code and fetches head as data without candidate execution.
 
 ## Commands

@@ -20,7 +20,7 @@ It intentionally rejects the canonical `Thytu/agent-rules` checkout, non-`main` 
 
 After initialization:
 
-1. Fill `SCOPE.md` and `VERIFICATION.md`.
+1. Fill `VERIFICATION.md`.
 2. Run `bash scripts/verify.sh`.
 3. Commit the initialized product repository.
 4. Run `bash scripts/setup-github.sh` to install repository settings, required checks, and vulnerability alerts without scheduled dependency-update pull requests.

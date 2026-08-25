@@ -230,7 +230,7 @@ const realSubjects = {
 	},
 	"real-bs-capabilities": {
 		anchor:
-			"// The nine capabilities the product actually ships (SCOPE's six firm",
+			"// The nine capabilities the product actually ships: six firm requirements",
 		lines: 3,
 	},
 	"real-track-header": {

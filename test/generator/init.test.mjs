@@ -273,10 +273,6 @@ for (const mode of ["rust", "typescript", "rust,typescript"]) {
 		assert.match(`${incomplete.stdout}${incomplete.stderr}`, /REPLACE_ME/);
 		if (mode === "rust,typescript") {
 			writeFileSync(
-				join(root, "SCOPE.md"),
-				"# Scope\n\nBuild a production product.\n",
-			);
-			writeFileSync(
 				join(root, "VERIFICATION.md"),
 				"# Verification\n\nRun the product smoke at its real boundary.\n",
 			);
