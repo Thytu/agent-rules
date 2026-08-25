@@ -51,8 +51,8 @@ function repository(t, remote = "https://github.com/example/product.git") {
 		rmSync(temp, {
 			recursive: true,
 			force: true,
-			maxRetries: 5,
-			retryDelay: 50,
+			maxRetries: 20,
+			retryDelay: 100,
 		}),
 	);
 	const root = join(temp, "repo");
