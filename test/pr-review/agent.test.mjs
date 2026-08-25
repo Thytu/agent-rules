@@ -96,6 +96,8 @@ function fauxRuntime(responses) {
 
 test("starts exactly one Pi agent per discovered rule document", async () => {
 	const { agents, systems } = await loadSystems();
+	for (const agent of agents)
+		assert.match(systems.get(agent.id), /\n## Review scope\n/);
 	const changes = Array.from({ length: 240 }, (_, index) => ({
 		status: "M",
 		path: `app/routes/route-${index}.tsx`,

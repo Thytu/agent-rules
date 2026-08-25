@@ -17,7 +17,8 @@
 		"audit": "pnpm audit --audit-level high",
 		"verify": "bash template/core/files/scripts/verify.sh --source && pnpm format:check && pnpm lint && pnpm test && pnpm run audit",
 		"review:dev": "node tooling/pr-review/review.mjs dev",
-		"review:holdout": "node tooling/pr-review/review.mjs holdout"
+		"review:holdout": "node tooling/pr-review/review.mjs holdout",
+		"review:blind": "node tooling/pr-review/review.mjs blind"
 	},
 	"devDependencies": {
 		"@biomejs/biome": "2.5.7",

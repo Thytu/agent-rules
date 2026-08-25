@@ -39,9 +39,9 @@ export function loadSpeakers(db, eventId) {
 // same tokens the live app uses, so the marketing page shows the actual thing
 // and not a stylized impression.
 export function SubmissionsMock() {
-	return <div className="rounded-card border border-hair bg-surface" />;
+	return <section className="rounded-card border border-hair bg-surface"><h2>Submissions</h2><p>No submissions yet.</p></section>;
 }`,
-		violations: ["comments"],
+		violations: [],
 	},
 
 	// ---- bs-comment: clean traps ----
@@ -69,14 +69,20 @@ export async function writeUserProfile(db: AtomicDatabase, insertUser: unknown, 
 	{
 		id: "ok-security-why",
 		file: "app/routes/admin.submissions.tsx",
-		code: `import type { AuthenticatedUser, RuntimeEnv } from "../runtime";
-
-declare function getActiveEvent(env: RuntimeEnv, user: AuthenticatedUser): Promise<{ id: string }>;
+		code: `import { getActiveEvent } from "../lib/events";
+import type { AuthenticatedUser, RuntimeEnv } from "../runtime";
 
 // Server-derive the tenant; never trust a client-supplied eventId.
 export async function activeEventId(env: RuntimeEnv, user: AuthenticatedUser) {
 	return (await getActiveEvent(env, user)).id;
 }`,
+		contextFiles: {
+			"app/lib/events.ts": `import type { AuthenticatedUser, RuntimeEnv } from "../runtime";
+
+export async function getActiveEvent(_env: RuntimeEnv, user: AuthenticatedUser) {
+	return { id: "active-" + user.tenantId };
+}`,
+		},
 		violations: [],
 	},
 	{
@@ -116,6 +122,10 @@ export async function activeEventId(env: RuntimeEnv, user: AuthenticatedUser) {
 it("has welcome copy", () => {
 	expect(WELCOME_COPY).toContain("Welcome to the call for speakers");
 });`,
+		contextFiles: {
+			"app/copy.ts": `export const WELCOME_COPY = "Welcome to the call for speakers";
+`,
+		},
 		violations: ["testing"],
 	},
 	{
@@ -131,23 +141,58 @@ it("has welcome copy", () => {
 	{
 		id: "ok-real-regression-test",
 		file: "test/contacts.test.ts",
-		code: `it("rejects a duplicate email in the same event", async () => {
+		code: `import { addContact, contacts, db, eq, eventId } from "../app/contacts";
+
+it("rejects a duplicate email in the same event", async () => {
 	await addContact(db, { eventId, email: "a@b.com" });
-	await expect(addContact(db, { eventId, email: "a@b.com" })).rejects.toThrow(/unique/);
+	await expect(addContact(db, { eventId, email: "a@b.com" })).rejects.toThrow();
 	const rows = await db.select().from(contacts).where(eq(contacts.eventId, eventId));
 	expect(rows).toHaveLength(1);
 });`,
+		contextFiles: {
+			"app/contacts.ts": `export const eventId = "event-1";
+export const contacts = { eventId: "eventId" } as const;
+const rows: Array<{ eventId: string; email: string }> = [];
+export const db = {
+	select: () => ({ from: () => ({ where: async () => [...rows] }) }),
+};
+export const eq = (left: string, right: string) => ({ left, right });
+export async function addContact(_db: typeof db, contact: { eventId: string; email: string }) {
+	if (rows.some((row) => row.eventId === contact.eventId && row.email === contact.email)) {
+		throw new Error("unique contact");
+	}
+	rows.push(contact);
+}`,
+		},
 		violations: [],
 	},
 	{
 		id: "ok-load-bearing-negative",
-		file: "test/authz.test.ts",
-		code: `it("403s a non-admin and never writes", async () => {
-	const res = await action(reqAs(reviewer));
+		file: "test/authz.integration.test.ts",
+		code: `import { app, db, reqAs, reviewer, submissions } from "../app/authz";
+
+it("403s a non-admin and never writes", async () => {
+	const res = await app.fetch(reqAs(reviewer));
 	expect(res.status).toBe(403);
 	const rows = await db.select().from(submissions);
 	expect(rows).toHaveLength(0);
 });`,
+		contextFiles: {
+			"app/authz.ts": `export const reviewer = { role: "reviewer" } as const;
+export const submissions = {};
+const rows: unknown[] = [];
+export const db = { select: () => ({ from: async () => [...rows] }) };
+export const reqAs = (user: typeof reviewer) => new Request("https://fixture.test/admin", {
+	headers: { "x-role": user.role },
+});
+export const app = {
+	async fetch(request: Request) {
+		if (request.headers.get("x-role") !== "admin") return new Response(null, { status: 403 });
+		rows.push({});
+		return new Response(null, { status: 204 });
+	},
+};`,
+		},
 		violations: [],
 	},
 
@@ -215,13 +260,29 @@ export function createAirtableSync(env: RuntimeEnv) {
 	{
 		id: "ok-bounded-logged",
 		file: "app/lib/recent.ts",
-		code: `export async function recentSubmissions(db, request) {
-	const user = await requireUser(request);
+		code: `import { submissions } from "../db/schema";
+import { eq } from "../db/query";
+import type { RequestContext } from "../runtime";
+
+export async function recentSubmissions(db, context: RequestContext) {
 	const rows = await db.select().from(submissions)
-		.where(eq(submissions.tenantId, user.tenantId)).limit(50);
-	if (rows.length === 50) log("recentSubmissions truncated at 50");
-	return rows;
+		.where(eq(submissions.tenantId, context.user.tenantId)).limit(51);
+	return { rows: rows.slice(0, 50), truncated: rows.length > 50 };
 }`,
+		contextFiles: {
+			"app/auth.ts": `import type { RequestContext } from "./runtime";
+export interface SessionVerifier { verify(request: Request): Promise<RequestContext["user"] | null> }
+export async function authenticate(request: Request, verifier: SessionVerifier): Promise<RequestContext> {
+	const user = await verifier.verify(request);
+	if (!user) throw new Error("authentication required");
+	return { user };
+}`,
+			"app/routes/recent.ts": `import { authenticate, type SessionVerifier } from "../auth";
+import { recentSubmissions } from "../lib/recent";
+export async function loader(request, db, verifier: SessionVerifier) {
+	return recentSubmissions(db, await authenticate(request, verifier));
+}`,
+		},
 		violations: [],
 	},
 
@@ -242,6 +303,13 @@ export { EmailSender as Mailer } from "./sender";`,
 		? row.status
 		: (row.status?.value ?? "pending");
 }`,
+		contextFiles: {
+			"docs/contracts/submission-status.md": `# Submission status
+
+Owner-approved current contract: status is a string. The former provider object
+shape is retired; application readers must not accept both representations.
+`,
+		},
 		violations: ["boundaries", "contract-evolution"],
 	},
 	{
@@ -256,11 +324,18 @@ export function serializeSessionV2(s) { return { id: s.id, title: s.title, track
 	{
 		id: "ok-api-v1-boundary",
 		file: "app/routes/api.v1.sessions.ts",
-		code: `// The /api/v1 envelope is Sessionboard-compatible on purpose (owner-decided
-// feature): default page size 25, max 100.
+		code: `// The external /api/v1 envelope remains Sessionboard-compatible:
+// default page size 25, max 100. See docs/contracts/sessionboard-v1.md.
 export function apiEnvelope(rows, page) {
-	return { data: rows, page, pageSize: 25 };
+	return { data: rows.slice(0, 25), page, pageSize: 25 };
 }`,
+		contextFiles: {
+			"docs/contracts/sessionboard-v1.md": `# Sessionboard API v1
+
+Owner-approved external compatibility contract. Responses use a data envelope,
+default page size 25, and maximum page size 100.
+`,
+		},
 		violations: [],
 	},
 	{
@@ -285,7 +360,7 @@ export function assignStableUid(event: CalendarEvent, session: Session) {
 	void provider.import(batch);
 	return { status: "started" };
 }`,
-		violations: ["lifecycle-capacity"],
+		violations: ["boundaries", "lifecycle-capacity"],
 	},
 	{
 		id: "lifecycle-unbounded-history",
@@ -343,18 +418,36 @@ export async function getUser(db, id) {
 	{
 		id: "ok-documented-fallback",
 		file: "app/ports/turnstile.ts",
-		code: `// Turnstile is a no-op in the judged deploy: the eval harness cannot solve a
-// real challenge, so live bot protection would zero the speaker-path coverage.
+		code: `import { callTurnstile } from "./turnstile-client";
+
+// Local and demonstration deployments expose an explicit non-success skip when
+// no secret is configured; production deployments execute live bot protection.
 export function verifyTurnstile(env, token) {
-	if (!env.TURNSTILE_SECRET) return { ok: true, skipped: true };
-	return callTurnstile(env.TURNSTILE_SECRET, token);
+	if (!env.TURNSTILE_SECRET) return { ok: false, skipped: true, reason: "not-configured" };
+	return callTurnstile(env.TURNSTILE_SECRET, token, { signal: AbortSignal.timeout(5_000) });
 }`,
+		contextFiles: {
+			"app/ports/turnstile-client.ts": `export async function callTurnstile(secret, token, options) {
+	const response = await fetch("https://challenges.cloudflare.com/turnstile/v0/siteverify", {
+		method: "POST",
+		body: JSON.stringify({ secret, response: token }),
+		signal: options.signal,
+	});
+	if (!response.ok) throw new Error("Turnstile verification failed");
+	const payload = await response.json();
+	if (!payload || typeof payload.success !== "boolean") throw new Error("Invalid Turnstile response");
+	return { ok: payload.success };
+}`,
+		},
 		violations: [],
 	},
 	{
 		id: "auth-client-tenant",
 		file: "app/lib/contacts.ts",
-		code: `export async function listContacts(db, input) {
+		code: `import { contacts } from "../db/schema";
+import { eq } from "../db/query";
+
+export async function listContacts(db, input) {
 	return db.select().from(contacts).where(eq(contacts.eventId, input.eventId));
 }`,
 		violations: ["authorization-persistence"],
@@ -362,19 +455,41 @@ export function verifyTurnstile(env, token) {
 	{
 		id: "ok-auth-server-tenant",
 		file: "app/lib/contacts.ts",
-		code: `export async function listContacts(db, request) {
-	const user = await requireUser(request);
+		code: `import { contacts } from "../db/schema";
+import { eq } from "../db/query";
+import type { RequestContext } from "../runtime";
+
+export async function listContacts(db, context: RequestContext) {
 	const rows = await db.select().from(contacts)
-		.where(eq(contacts.tenantId, user.tenantId)).limit(50);
-	return { rows, truncated: rows.length === 50 };
+		.where(eq(contacts.tenantId, context.user.tenantId)).limit(51);
+	return { rows: rows.slice(0, 50), truncated: rows.length > 50 };
 }`,
+		contextFiles: {
+			"app/auth.ts": `import type { RequestContext } from "./runtime";
+export interface SessionVerifier { verify(request: Request): Promise<RequestContext["user"] | null> }
+export async function authenticate(request: Request, verifier: SessionVerifier): Promise<RequestContext> {
+	const user = await verifier.verify(request);
+	if (!user) throw new Error("authentication required");
+	return { user };
+}`,
+			"app/routes/contacts.ts": `import { authenticate, type SessionVerifier } from "../auth";
+import { listContacts } from "../lib/contacts";
+export async function loader(request, db, verifier: SessionVerifier) {
+	return listContacts(db, await authenticate(request, verifier));
+}`,
+		},
 		violations: [],
 	},
 	{
 		id: "dependency-manifest-only",
 		file: "package.json",
 		code: `{
-	"dependencies": { "undici": "7.16.0" }
+	"name": "review-fixture",
+	"private": true,
+	"type": "module",
+	"scripts": { "test": "vitest run", "typecheck": "tsc --noEmit" },
+	"dependencies": { "undici": "7.16.0" },
+	"devDependencies": { "typescript": "5.9.2", "vitest": "3.2.4" }
 }`,
 		violations: ["dependency-integrity"],
 	},
@@ -382,9 +497,11 @@ export function verifyTurnstile(env, token) {
 		id: "ok-package-without-dependency-change",
 		file: "package.json",
 		code: `{
-	"name": "product",
+	"name": "review-fixture",
 	"private": true,
-	"scripts": { "start": "node app.js" }
+	"type": "module",
+	"scripts": { "start": "node app.js", "test": "vitest run", "typecheck": "tsc --noEmit" },
+	"devDependencies": { "typescript": "5.9.2", "vitest": "3.2.4" }
 }`,
 		violations: [],
 	},

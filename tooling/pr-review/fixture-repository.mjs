@@ -31,10 +31,10 @@ This repository is a complete, isolated review fixture. The changed module belon
 }
 `,
 	"app/db/schema.ts": `export interface Contact { id: string; eventId: string; tenantId: string; email: string }
-export interface Submission { id: string; eventId: string; title: string }
+export interface Submission { id: string; eventId: string; tenantId: string; title: string }
 export interface User { id: string; tenantId: string }
 export const contacts = { id: "id", eventId: "eventId", tenantId: "tenantId" } as const;
-export const submissions = { id: "id", eventId: "eventId" } as const;
+export const submissions = { id: "id", eventId: "eventId", tenantId: "tenantId" } as const;
 export const users = { id: "id", tenantId: "tenantId" } as const;
 export const events = { id: "id", tenantId: "tenantId" } as const;
 `,
@@ -99,8 +99,9 @@ function callerFor(path) {
 	return {
 		"test/review-context.test.ts": `import * as changedModule from "${specifier}";
 
-// The review target is loaded as a module so repository exploration can follow
-// its exported surface from a real caller rather than an isolated text snippet.
+// The review target is loaded as a module so repository exploration can establish
+// its exported surface. Individual fixtures add behavioral callers when the
+// reviewed contract depends on one.
 export const changedExports = Object.keys(changedModule);
 export const callerDepth = ${depth};
 `,
@@ -361,8 +362,8 @@ export function createFixtureRepository(testCase) {
 	}
 
 	return {
-		baseSha: `fixture-${testCase.id}-base`,
-		headSha: `fixture-${testCase.id}-head`,
+		baseSha: "1111111111111111111111111111111111111111",
+		headSha: "2222222222222222222222222222222222222222",
 		changes,
 		executeTool,
 		getRawDiff(path) {

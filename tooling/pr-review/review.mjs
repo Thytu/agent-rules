@@ -2,8 +2,9 @@
 // a multi-file base/head repository snapshot, and every dynamically discovered
 // rule owner reviews it through the same Pi agent harness used by ci-review.mjs.
 //
-//   OPENAI_API_KEY=... OPENAI_REASONING=high node review.mjs [dev|holdout]
+//   OPENAI_API_KEY=... OPENAI_REASONING=high node review.mjs [dev|holdout|blind]
 //   OPENAI_API_KEY=... node review.mjs models
+import { verifyBlindCorpus } from "./blind-integrity.mjs";
 import { runRuleReviewer } from "./agent.mjs";
 import {
 	DEFAULT_BASE_URL,
@@ -27,6 +28,10 @@ const TEMPERATURE =
 		: Number(process.env.TEMPERATURE);
 const CONC = Number(process.env.CONC ?? 8);
 const RUNS = Number(process.env.RUNS ?? 1);
+if (!Number.isInteger(CONC) || CONC < 1)
+	throw new Error("CONC must be a positive integer");
+if (!Number.isInteger(RUNS) || RUNS < 1)
+	throw new Error("RUNS must be a positive integer");
 const CASE_IDS = new Set(
 	String(process.env.CASE_IDS ?? "")
 		.split(",")
@@ -63,10 +68,19 @@ if (process.argv[2] === "models") {
 	process.exit(0);
 }
 
-const which = process.argv[2] === "holdout" ? "holdout" : "dev";
-const { cases: allCases } = await import(
-	which === "holdout" ? "./cases.holdout.mjs" : "./cases.mjs"
-);
+const requestedSet = process.argv[2];
+const which = ["dev", "holdout", "blind"].includes(requestedSet)
+	? requestedSet
+	: "dev";
+const modules = {
+	dev: "./cases.mjs",
+	holdout: "./cases.holdout.mjs",
+	blind: "./cases.blind.mjs",
+};
+if (which === "blind") await verifyBlindCorpus();
+if (which === "blind" && (CASE_IDS.size > 0 || PAIR_IDS.size > 0))
+	throw new Error("blind evaluation must run the complete frozen corpus");
+const { cases: allCases } = await import(modules[which]);
 const cases = CASE_IDS.size
 	? allCases.filter((testCase) => CASE_IDS.has(testCase.id))
 	: allCases;

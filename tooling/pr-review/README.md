@@ -215,15 +215,17 @@ against existing comments using read-only GitHub calls.
 ## Evaluation
 
 `review.mjs` evaluates the production autonomous-agent boundary. Every fixture
-contains a multi-file base/head repository snapshot with unchanged source,
-types, callers, tests, and configuration available through the same repository
-tools used in production. Every rule owner gets its own session, and any
-incomplete session aborts the run rather than being scored as a clean prediction.
+contains a full changed file in a multi-file base/head repository. Authored cases
+add contract-specific definitions or behavioral callers when their decision
+depends on them; real-source cases expose the full tracked repository. Every rule
+owner gets its own session, and any incomplete session aborts the run rather than
+being scored as a clean prediction.
 
 ```bash
 OPENAI_API_KEY=... OPENAI_MODEL=gpt-5.6-luna \
-  OPENAI_REASONING=high RUNS=5 node tooling/pr-review/review.mjs holdout
+  OPENAI_REASONING=high node tooling/pr-review/review.mjs blind
 OPENAI_API_KEY=... OPENAI_REASONING=high node tooling/pr-review/review.mjs dev
+OPENAI_API_KEY=... OPENAI_REASONING=high node tooling/pr-review/review.mjs holdout
 ```
 
 High reasoning is the production default. `OPENAI_REASONING=off` reproduces the
@@ -236,18 +238,25 @@ Flex resource exhaustion falls back automatically.
 A balanced 16-pair diagnostic (one positive and one clean case per owner, three
 runs each) measured reasoning off at P=63.9%, R=95.8%, F1=76.7% and high at
 P=66.7%, R=100%, F1=80.0%. This supports the high-reasoning default but is not a
-replacement for a complete development or holdout run.
+replacement for a complete corpus run.
 
-The first complete high-reasoning run over the corrected repositories measured
-development at P=26.7%, R=100%, F1=42.2% and holdout at P=26.1%, R=100%,
-F1=41.4%. These replace the earlier one-file scores; they still show that
-owner-scope false positives, not missed violations, dominate.
+After making each owner scope a hard eligibility gate, clarifying the general
+rules, completing authored repository context, narrowing real-source diffs to
+the reviewed subject, and labeling genuine cross-owner violations exhaustively,
+the first complete high-reasoning run over the frozen blind corpus measured
+P=73.1%, R=100%, F1=84.4% across 192 owner decisions. No prompt, rule, fixture, or
+label changed in response to that run. Development and the historically named
+holdout were used only as calibration data. Incomplete rate-limited runs are
+aborted and never included in scores.
 
 The evaluator prints micro and per-owner precision, recall, and F1. Development
-cases are available while tuning; holdout cases remain separate to expose
-overfitting. Results are a baseline only when every owner completes.
+and historical holdout cases are calibration data. `cases.blind.mjs` is frozen
+before its first model run; its materialized repositories are guarded by
+`cases.blind.sha256`. If they ever inform prompt, rule, fixture, or label changes,
+the corpus must be retired and replaced before another generalization claim.
+Results count only when every owner completes.
 
-The committed corpus has 36 development and 43 holdout fixtures. With eight
-owners, one run performs 288 and 344 owner evaluations respectively, or 632 for
-both. A retryable transport drop can add at most one provider session to an owner
-evaluation without resetting its limits.
+The committed corpora have 36 development, 43 historical holdout, and 24 blind
+fixtures. With eight owners, one run performs 288, 344, and 192 owner evaluations
+respectively. A retryable transport drop can add at most one provider session to
+an owner evaluation without resetting its limits.

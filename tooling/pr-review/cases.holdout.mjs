@@ -1,16 +1,16 @@
 import { defineFixtures } from "./fixture-repository.mjs";
 import { OPENROSTRUM_FILES } from "./openrostrum-snapshot.mjs";
 
-// HELD-OUT test set — the real generalization metric. It is NEVER used to tune
-// the doctrine: the prompt must not be edited in reaction to any failure here.
+// Calibration corpus retained under its historical `holdout` command name. It
+// has been inspected while tuning owner scopes and is not a generalization
+// metric. `cases.blind.mjs` is the frozen post-tuning validation set.
 //
 // Two kinds:
 //  - source:"real" exposes a complete OpenRostrum source file plus the full
 //    tracked text repository: definitions, reverse callers, tests, documents,
-//    package manifest, lockfile, workflows, and configuration. Most are clean:
-//    legitimate WHY comments, regression tests, and sanctioned throws.
-//  - source:"authored" adds a complete changed module to the shared multi-file
-//    fixture application. Its positives use surfaces unlike the development set.
+//    package manifest, lockfile, workflows, and configuration.
+//  - source:"authored" adds a full changed module to the shared multi-file
+//    fixture application, with case-specific context where its contract needs it.
 //
 // Borderline real changes are excluded so labels remain an oracle, not a coin flip.
 
@@ -21,7 +21,7 @@ const specs = [
 		source: "real",
 		file: "app/root.tsx",
 		code: `// Fonts are self-hosted (open-source product — no CDN); @font-face lives in
-// app.css, preloads here cover the two faces on every first paint.
+// app.css, and preloads here cover the three first-paint faces.
 export const links = () => [
 	{ rel: "preload", href: "/fonts/plex-sans-400.woff2", as: "font" },
 ];`,
@@ -84,10 +84,8 @@ const selected = "bg-row-selected shadow-[inset_2px_0_0_0_var(--color-petrol)]";
 		id: "real-status-badge-dark",
 		source: "real",
 		file: "app/ui/status-badge.tsx",
-		code: `// Status colors follow web convention (green=positive, red=negative) and are
-// deliberately NOT skin tokens: they survive a re-skin unchanged. They live
-// outside light-dark(), so this is the one primitive that writes dark:
-// variants (there is no theme toggle — the media query can't desync).
+		code: `// Status hues carry fixed semantic meaning across skins and themes, so they
+// remain independent from brand tokens while dark variants preserve contrast.
 const tone = { accepted: "bg-green-100 dark:bg-green-950" };`,
 		violations: [],
 	},
@@ -194,7 +192,9 @@ const id = process.env.CF_D1_DATABASE_ID;`,
 		id: "trap-union-input",
 		source: "authored",
 		file: "app/lib/tracks.ts",
-		code: `export function toTracks(input) {
+		code: `export interface Track { id: string; title: string }
+
+export function toTracks(input: Track | readonly Track[]): readonly Track[] {
 	return Array.isArray(input) ? input : [input];
 }`,
 		violations: [],
@@ -222,11 +222,18 @@ export const FEATURES = [
 		id: "trap-injected-clock",
 		source: "authored",
 		file: "test/stamp.test.ts",
-		code: `it("stamps createdAt", () => {
+		code: `import { build } from "../app/stamp";
+
+it("stamps createdAt", () => {
 	const clock = { now: () => 1000 };
 	const row = build({ clock });
 	expect(row.createdAt).toBe(1000);
 });`,
+		contextFiles: {
+			"app/stamp.ts": `export function build({ clock }: { clock: { now(): number } }) {
+	return { createdAt: clock.now() };
+}`,
+		},
 		violations: [],
 	},
 	{
@@ -254,14 +261,22 @@ export const FEATURES = [
 		id: "hp-shortcut-default-on-catch",
 		source: "authored",
 		file: "app/lib/prefs.ts",
-		code: `export async function loadPrefs(db, id) {
+		code: `export interface Preferences { theme: string }
+export interface PreferencesStore { get(userId: string): Promise<Preferences> }
+export interface Database { prefs: PreferencesStore }
+
+export async function loadPrefs(db: Database, userId: string) {
 	try {
-		return await db.prefs.get(id);
-	} catch (e) {
+		return await db.prefs.get(userId);
+	} catch (error) {
 		return {};
 	}
 }`,
-		violations: ["boundaries", "lifecycle-capacity"],
+		violations: [
+			"authorization-persistence",
+			"boundaries",
+			"lifecycle-capacity",
+		],
 	},
 	{
 		id: "hp-legacy-deprecated-fn",
@@ -301,8 +316,8 @@ export function SkeletonRows({ n = 8 }) {
 		id: "real-empty-state",
 		source: "real",
 		file: "app/ui/empty-state.tsx",
-		code: `// An empty state says WHY it's empty and what to do next — "No X found"
-// with no action ends the user's journey.
+		code: `// Explain why the view is empty and include a next action when recovery is
+// available; passive empty states may intentionally omit an action.
 export function EmptyState({ title, action }) {
 	return panel(title, action);
 }`,
@@ -376,14 +391,22 @@ export async function enrich(db, ids) {
 		id: "hp-shortcut-empty-list-catch",
 		source: "authored",
 		file: "app/lib/tags.ts",
-		code: `export async function tagsFor(db, id) {
+		code: `export interface Tag { id: string; name: string }
+export interface TagStore { forSession(sessionId: string): Promise<Tag[]> }
+export interface Database { tags: TagStore }
+
+export async function tagsFor(db: Database, sessionId: string) {
 	try {
-		return await db.tags.forSession(id);
+		return await db.tags.forSession(sessionId);
 	} catch {
 		return [];
 	}
 }`,
-		violations: ["boundaries", "lifecycle-capacity"],
+		violations: [
+			"authorization-persistence",
+			"boundaries",
+			"lifecycle-capacity",
+		],
 	},
 	{
 		id: "hp-legacy-renamed-column",
@@ -392,6 +415,13 @@ export async function enrich(db, ids) {
 		code: `export function emailOf(row) {
 	return row.email ?? row.emailAddress;
 }`,
+		contextFiles: {
+			"docs/contracts/contact-email.md": `# Contact email
+
+Owner-approved current contract: contact rows expose email. The former
+emailAddress column is retired; application readers must not accept both names.
+`,
+		},
 		violations: ["boundaries", "contract-evolution"],
 	},
 	{
@@ -418,17 +448,41 @@ export const getName = displayName;`,
 		id: "trap-auth-context-scope",
 		source: "authored",
 		file: "app/lib/accounts.ts",
-		code: `export async function renameAccount(db, user, input) {
-	return db.update(accounts).set({ name: input.name }).where(and(eq(accounts.id, input.id), eq(accounts.tenantId, user.tenantId)));
+		code: `import type { RequestContext } from "../runtime";
+
+export async function renameAccount(db, context: RequestContext, input) {
+	return db.update(accounts).set({ name: input.name }).where(and(eq(accounts.id, input.id), eq(accounts.tenantId, context.user.tenantId)));
 }`,
+		contextFiles: {
+			"app/auth.ts": `import type { RequestContext } from "./runtime";
+export interface SessionVerifier { verify(request: Request): Promise<RequestContext["user"] | null> }
+export async function authenticate(request: Request, verifier: SessionVerifier): Promise<RequestContext> {
+	const user = await verifier.verify(request);
+	if (!user) throw new Error("authentication required");
+	return { user };
+}`,
+			"app/routes/accounts.ts": `import { authenticate, type SessionVerifier } from "../auth";
+import { renameAccount } from "../lib/accounts";
+export async function action(request, db, input, verifier: SessionVerifier) {
+	return renameAccount(db, await authenticate(request, verifier), input);
+}`,
+		},
 		violations: [],
 	},
 	{
 		id: "hp-lifecycle-no-timeout",
 		source: "authored",
 		file: "app/ports/provider.ts",
-		code: `export async function fetchProvider(url: URL) {
-	return fetch(url);
+		code: `export interface Account { id: string }
+
+export async function fetchAccount(url: URL): Promise<Account> {
+	const response = await fetch(url);
+	if (!response.ok) throw new Error("account fetch failed");
+	const payload: unknown = await response.json();
+	if (!payload || typeof payload !== "object" || !("id" in payload) || typeof payload.id !== "string") {
+		throw new Error("provider returned an invalid account");
+	}
+	return { id: payload.id };
 }`,
 		violations: ["lifecycle-capacity"],
 	},
@@ -436,8 +490,16 @@ export const getName = displayName;`,
 		id: "trap-lifecycle-deadline",
 		source: "authored",
 		file: "app/ports/provider.ts",
-		code: `export async function fetchProvider(url: URL) {
-	return fetch(url, { signal: AbortSignal.timeout(5000) });
+		code: `export interface Account { id: string }
+
+export async function fetchAccount(url: URL): Promise<Account> {
+	const response = await fetch(url, { signal: AbortSignal.timeout(5000) });
+	if (!response.ok) throw new Error("account fetch failed");
+	const payload: unknown = await response.json();
+	if (!payload || typeof payload !== "object" || !("id" in payload) || typeof payload.id !== "string") {
+		throw new Error("provider returned an invalid account");
+	}
+	return { id: payload.id };
 }`,
 		violations: [],
 	},
@@ -464,7 +526,13 @@ export const getName = displayName;`,
 		id: "hp-dependency-without-lock",
 		source: "authored",
 		file: "Cargo.toml",
-		code: `[dependencies]
+		code: `[package]
+name = "review-fixture"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[dependencies]
 serde = "1.0"`,
 		violations: ["dependency-integrity"],
 	},
@@ -473,8 +541,11 @@ serde = "1.0"`,
 		source: "authored",
 		file: "Cargo.toml",
 		code: `[package]
-name = "product"
-publish = false`,
+name = "review-fixture"
+version = "0.1.0"
+edition = "2024"
+publish = false
+description = "Conference review fixture"`,
 		violations: [],
 	},
 ];
@@ -482,21 +553,71 @@ publish = false`,
 const REAL_ANCHORS = {
 	"real-bs-capabilities": "// The nine jobs that make up the program side",
 	"real-entry-bots": "// Ensure requests from bots and SPA Mode renders",
-	"real-email-throw": "export function createResendEmailSender",
+	"real-email-throw": "if (!from) {",
 	"real-resend-test": 'it("throws on a non-2xx provider response',
 	"real-worker-env": "// Runtime SECRETS",
 };
 
-function withoutReviewedSubject(spec, code) {
-	const sourceLines = spec.code.split("\n");
-	const first = sourceLines.find((line) => line.trim())?.trim();
-	const anchor = REAL_ANCHORS[spec.id] ?? first;
+const REAL_COMMENT_SOURCE_ANCHORS = {
+	"real-empty-state":
+		"// An empty state says WHY it's empty and what to do next",
+	"real-status-badge-dark": "// Status colors follow web convention",
+};
+
+function materializeReviewedComments(spec, code) {
+	const replacement = [];
+	for (const line of spec.code.split("\n")) {
+		if (!line.trim().startsWith("//")) break;
+		replacement.push(line);
+	}
+	if (replacement.length === 0) return code;
+
 	const lines = code.split("\n");
-	const start = lines.findIndex((line) => line.trim().startsWith(anchor));
-	if (start < 0)
+	const anchor =
+		REAL_COMMENT_SOURCE_ANCHORS[spec.id] ??
+		REAL_ANCHORS[spec.id] ??
+		replacement[0].trim();
+	const matches = lines.flatMap((line, index) =>
+		line.trim().startsWith(anchor) ? [index] : [],
+	);
+	if (matches.length !== 1)
 		throw new Error(
-			`${spec.id} subject is absent from its captured source file`,
+			`${spec.id} subject anchor matched ${matches.length} captured source lines`,
 		);
+	const [start] = matches;
+	const indent = lines[start].match(/^\s*/)?.[0] ?? "";
+	const indentedReplacement = replacement.map(
+		(line) => `${indent}${line.trimStart()}`,
+	);
+	let end = start;
+	while (end + 1 < lines.length && lines[end + 1].trim().startsWith("//"))
+		end++;
+	return [
+		...lines.slice(0, start),
+		...indentedReplacement,
+		...lines.slice(end + 1),
+	].join("\n");
+}
+
+function reviewedAnchor(spec) {
+	const first = spec.code
+		.split("\n")
+		.find((line) => line.trim())
+		?.trim();
+	return first?.startsWith("//") ? first : (REAL_ANCHORS[spec.id] ?? first);
+}
+
+function withoutReviewedSubject(spec, code) {
+	const anchor = reviewedAnchor(spec);
+	const lines = code.split("\n");
+	const matches = lines.flatMap((line, index) =>
+		line.trim().startsWith(anchor) ? [index] : [],
+	);
+	if (matches.length !== 1)
+		throw new Error(
+			`${spec.id} reviewed anchor matched ${matches.length} head source lines`,
+		);
+	const [start] = matches;
 
 	let end = start;
 	if (lines[start].trim().startsWith("//")) {
@@ -521,15 +642,17 @@ function withoutReviewedSubject(spec, code) {
 export const cases = defineFixtures(
 	specs.map((spec) => {
 		if (spec.source !== "real") return spec;
-		const code = OPENROSTRUM_FILES[spec.file];
-		if (code === undefined)
+		const captured = OPENROSTRUM_FILES[spec.file];
+		if (captured === undefined)
 			throw new Error(`${spec.id} has no captured OpenRostrum source file`);
+		const code = materializeReviewedComments(spec, captured);
+		const baseCode = withoutReviewedSubject(spec, code);
 		const contextFiles = { ...OPENROSTRUM_FILES };
 		delete contextFiles[spec.file];
 		return {
 			...spec,
 			code,
-			baseCode: withoutReviewedSubject(spec, code),
+			baseCode,
 			contextFiles,
 		};
 	}),
