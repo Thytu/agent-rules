@@ -129,7 +129,8 @@ function clearsItsOwnSubject({ rule, why }) {
 // The bank. Every finding enters the review through this one tool call, so this
 // is where the boundary lives: Pi checks the arguments against FINDING before
 // execute runs, and what survives both is clamped, stamped, and counted.
-function createFindingSink(agent, changedPaths) {
+function createFindingSink(agent, repository) {
+	const changedPaths = new Set(repository.changes.map((change) => change.path));
 	const findings = [];
 	const seen = new Set();
 
@@ -145,6 +146,10 @@ function createFindingSink(agent, changedPaths) {
 				if (!changedPaths.has(params.file))
 					throw new Error(
 						`this finding cites ${params.file}, which this pull request does not change; quote a line from a changed file instead`,
+					);
+				if (!repository.validateFinding(params))
+					throw new Error(
+						`this finding's quote does not occur on added line ${params.line} of ${params.file}; cite the exact changed line and absolute new-file line`,
 					);
 				if (clearsItsOwnSubject(params))
 					throw new Error(
@@ -313,8 +318,7 @@ async function runRuleReviewerSession({
 	runtime,
 	limits,
 }) {
-	const changedPaths = new Set(repository.changes.map((change) => change.path));
-	const sink = createFindingSink(agent, changedPaths);
+	const sink = createFindingSink(agent, repository);
 	const terminal = createTerminal();
 	let closed;
 	// Keyed by the assistant message that requested the calls, so the count is
@@ -333,14 +337,13 @@ async function runRuleReviewerSession({
 		initialState: {
 			systemPrompt: system,
 			model: runtime.model,
-			thinkingLevel: "off",
+			thinkingLevel: runtime.reasoning,
 			tools: [...createRepositoryTools(repository), sink.tool, terminal.tool],
 		},
-		// Every response must be a tool call. Prose was the overflow: one reviewer
-		// spent an 8192-token response — the provider's hard cap, whatever ceiling
-		// is requested — on commentary by its fifth turn and never reached a
-		// finding. Asking for tool calls only did not stop it; having no other
-		// channel does.
+		// Every response must be a tool call. A prior provider migration exposed the
+		// failure mode: one reviewer spent an entire response on commentary by its
+		// fifth turn and never reached a finding. Asking for tool calls did not stop
+		// it; having no other response channel does.
 		streamFn: (model, context, options = {}) =>
 			runtime.streamFn(model, context, { ...options, toolChoice: "required" }),
 		toolExecution: "parallel",
@@ -357,8 +360,8 @@ async function runRuleReviewerSession({
 			}
 			if (toolCall.name !== SUBMIT_TOOL) return undefined;
 			// Refused, not fatal: the reviewer is told to re-issue it, and the next
-			// response is a fresh allowance. This is the cap RESPONSE_CEILING is
-			// derived from, which is why it is enforced rather than merely asked for.
+			// response is a fresh allowance. This cap bounds recorded findings per
+			// response; the request itself uses the model catalog's token ceiling.
 			const used = (submissionsPerResponse.get(assistantMessage) ?? 0) + 1;
 			submissionsPerResponse.set(assistantMessage, used);
 			if (used <= limits.maxSubmissionsPerResponse) return undefined;
@@ -499,12 +502,65 @@ export function isRetryableTransportFailure(reason) {
 
 export async function runRuleReviewer(args) {
 	const limits = { ...DEFAULT_LIMITS, ...args.limits };
+	const deadline = Date.now() + limits.timeoutMs;
+	const findings = [];
+	const seen = new Set();
+	const totals = { turns: 0, toolCalls: 0, reasked: 0, forced: false };
+	const combine = (result) => {
+		for (const finding of result.findings) {
+			const key = submissionKey(finding);
+			if (!seen.has(key)) {
+				seen.add(key);
+				findings.push(finding);
+			}
+		}
+		totals.turns += result.turns ?? 0;
+		totals.toolCalls += result.toolCalls ?? 0;
+		totals.reasked += result.reasked ?? 0;
+		totals.forced ||= Boolean(result.forced);
+		return {
+			...result,
+			findings: [...findings],
+			turns: totals.turns,
+			toolCalls: totals.toolCalls,
+			reasked: totals.reasked,
+			forced: totals.forced,
+		};
+	};
+
 	let last;
 	for (let attempt = 0; attempt <= TRANSPORT_RETRIES; attempt++) {
-		last = await runRuleReviewerSession({
-			...args,
-			limits,
-		});
+		const remainingMs = deadline - Date.now();
+		if (remainingMs <= 0) {
+			return incomplete(args.agent, "review timeout exceeded", findings, {
+				...totals,
+				closing: last?.closing ?? false,
+				retried: attempt || undefined,
+			});
+		}
+		if (
+			attempt > 0 &&
+			(totals.turns >= limits.maxTurns ||
+				totals.toolCalls >= limits.maxToolCalls)
+		) {
+			return incomplete(
+				args.agent,
+				"review budget exceeded across transport retry",
+				findings,
+				{ ...totals, closing: last?.closing ?? false, retried: attempt },
+			);
+		}
+		last = combine(
+			await runRuleReviewerSession({
+				...args,
+				limits: {
+					...limits,
+					maxTurns: Math.max(1, limits.maxTurns - totals.turns),
+					maxToolCalls: Math.max(1, limits.maxToolCalls - totals.toolCalls),
+					timeoutMs: remainingMs,
+				},
+			}),
+		);
 		if (last.status === "complete") {
 			if (attempt > 0) last.retried = attempt;
 			return last;

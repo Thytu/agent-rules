@@ -1,12 +1,18 @@
-// Production PR reviewer. Runs one autonomous whole-PR DeepSeek session per
+// Production PR reviewer. Runs one autonomous whole-PR GPT-5.6 Luna session per
 // dynamically discovered rule document, then deterministically posts one
 // advisory review (event always COMMENT — informs, never gates). Repository
 // context is read on demand through bounded, read-only tools. Posting fallback
 // and reconciliation semantics live in inline.mjs and are documented in README.
-// Env (set by .github/workflows/ci.yml): DEEPSEEK_API_KEY, GH_TOKEN, REPO
+// Env (set by .github/workflows/ai-review.yml): OPENAI_API_KEY, GH_TOKEN, REPO
 // (owner/repo), PR_NUMBER, BASE_SHA, HEAD_SHA.
 import { runRuleReviewers, summaryLine } from "./agent.mjs";
-import { loadSystems, makeRuntime } from "./core.mjs";
+import {
+	DEFAULT_BASE_URL,
+	DEFAULT_MODEL,
+	DEFAULT_SERVICE_TIER,
+	loadSystems,
+	makeRuntime,
+} from "./core.mjs";
 import {
 	anchorFinding,
 	buildReviewPayload,
@@ -24,11 +30,14 @@ import {
 } from "./inline.mjs";
 import { createGitRepository } from "./repository.mjs";
 
-const KEY = process.env.DEEPSEEK_API_KEY;
-const BASE = process.env.DEEPSEEK_BASE_URL || "https://api.deepseek.com";
-const MODEL = process.env.DEEPSEEK_MODEL || "deepseek-v4-flash";
-const TEMPERATURE = Number(process.env.TEMPERATURE ?? 0);
-const CONC = Number(process.env.CONC ?? 6);
+const KEY = process.env.OPENAI_API_KEY;
+const BASE = process.env.OPENAI_BASE_URL || DEFAULT_BASE_URL;
+const MODEL = process.env.OPENAI_MODEL || DEFAULT_MODEL;
+const SERVICE_TIER = process.env.OPENAI_SERVICE_TIER || DEFAULT_SERVICE_TIER;
+const TEMPERATURE =
+	process.env.TEMPERATURE === undefined
+		? undefined
+		: Number(process.env.TEMPERATURE);
 
 const GH_TOKEN = process.env.GH_TOKEN;
 const REPO = process.env.REPO;
@@ -43,9 +52,9 @@ const HEAD_SHA = process.env.HEAD_SHA;
 const DRY = process.env.DRY_RUN === "1" || process.argv.includes("--dry-run");
 
 const required = DRY
-	? { DEEPSEEK_API_KEY: KEY, BASE_SHA, HEAD_SHA }
+	? { OPENAI_API_KEY: KEY, BASE_SHA, HEAD_SHA }
 	: {
-			DEEPSEEK_API_KEY: KEY,
+			OPENAI_API_KEY: KEY,
 			GH_TOKEN,
 			REPO,
 			PR_NUMBER: PR,
@@ -71,7 +80,7 @@ async function gh(method, path, body) {
 			authorization: `Bearer ${GH_TOKEN}`,
 			accept: "application/vnd.github+json",
 			"content-type": "application/json",
-			"user-agent": "deepseek-review",
+			"user-agent": "rule-owner-review",
 		},
 		body: body ? JSON.stringify(body) : undefined,
 	});
@@ -96,7 +105,7 @@ async function ghGraphql(query, variables) {
 		headers: {
 			authorization: `Bearer ${GH_TOKEN}`,
 			"content-type": "application/json",
-			"user-agent": "deepseek-review",
+			"user-agent": "rule-owner-review",
 		},
 		body: JSON.stringify({ query, variables }),
 	});
@@ -238,6 +247,7 @@ const runtime = makeRuntime({
 	base: BASE,
 	model: MODEL,
 	temperature: TEMPERATURE,
+	serviceTier: SERVICE_TIER,
 });
 
 console.log(
@@ -248,7 +258,7 @@ const results = await runRuleReviewers({
 	systems,
 	repository,
 	runtime,
-	concurrency: CONC,
+	concurrency: agents.length,
 });
 const incomplete = results.filter((result) => result.status !== "complete");
 const reviewComplete = incomplete.length === 0;
@@ -314,7 +324,7 @@ const resolvable = stale.resolvable;
 const deferred = stale.deferred.length;
 
 const headerLines = [
-	`### 🤖 DeepSeek review — ${total} finding(s) across ${byFile.size} file(s)`,
+	`### 🤖 GPT-5.6 Luna review — ${total} finding(s) across ${byFile.size} file(s)`,
 	"_Advisory (comment-only): this does not block merge. Each finding cites the rule doc it came from._",
 ];
 if (skipped.length)
@@ -407,8 +417,8 @@ if (DRY) {
 
 if (total === 0) {
 	const title = reviewComplete
-		? "### 🤖 DeepSeek review — no issues found"
-		: "### 🤖 DeepSeek review — incomplete";
+		? "### 🤖 GPT-5.6 Luna review — no issues found"
+		: "### 🤖 GPT-5.6 Luna review — incomplete";
 	const detail = reviewComplete
 		? `_Reviewed all ${repository.changes.length} changed file(s) against \`docs/rules/\` with one whole-PR session per rule document. Advisory (comment-only)._`
 		: `_No clean result: ${incomplete
@@ -474,7 +484,7 @@ if (total === 0) {
 			await upsertSummaryComment(
 				[
 					SUMMARY_MARKER,
-					`### 🤖 DeepSeek review — ${total} finding(s) across ${byFile.size} file(s)`,
+					`### 🤖 GPT-5.6 Luna review — ${total} finding(s) across ${byFile.size} file(s)`,
 					"_Findings are posted as review comments on the diff — resolve, dismiss, or answer each individually. Advisory (comment-only)._",
 					footer,
 				].join("\n"),

@@ -1,22 +1,21 @@
 # PR review — autonomous rule owners
 
-The production reviewer runs one independent DeepSeek session per dynamically
-discovered `docs/rules/*.md` document. Each session owns the entire pull request
-under its assigned rule document and decides what repository evidence to inspect.
+The source reviewer runs exactly eight independent owner reviews, one per top-level `docs/rules/*.md` owner. Each owns the whole pull request under its assigned document. A retryable transport drop may open one fresh provider session, but it keeps the owner’s original deadline, tool budget, and already-proven findings. Generated repositories receive the rule documents as coding guidance but no reviewer runtime or workflow.
 
 ## Architecture
 
-- `agents.mjs` discovers and sorts every rule document; there is no maintained
-  reviewer list.
-- `core.mjs` loads each document verbatim, configures Pi's native DeepSeek provider
-  for `deepseek-v4-flash`, and owns the answer-volume contract: the shared prompt
-  preamble bans narration, progress notes, and restating the rule document, and
-  `FINDING_LIMITS` fixes the per-field size of a finding. Reading is free; only
-  writing spends the budget. `RESPONSE_CEILING` is the output ceiling every request
-  asks for, derived from that contract rather than chosen: no response carries more
-  than `SUBMISSIONS_PER_RESPONSE` findings of at most `FINDING_LIMITS` each, doubled
-  to leave the model room for its own words. A model whose own ceiling is lower is
-  asked for that instead.
+- `agents.mjs` discovers and sorts the eight top-level rule documents and fails if the count differs from the declared budget. There are no profile reviewers or marker stubs.
+- `core.mjs` loads each document verbatim and configures Pi's native OpenAI
+  Responses provider for `gpt-5.6-luna`. Production requests use high reasoning
+  and Flex processing. `OPENAI_REASONING=off` exists only for controlled
+  evaluation. A `429 resource_unavailable` response is retried once with
+  standard processing; other rate-limit, authentication, and validation
+  failures retain their real semantics. `FINDING_LIMITS` bounds what reaches
+  GitHub, and requests use the model catalog's explicit `maxTokens` ceiling so a
+  valid multi-tool response is not truncated. Cost remains bounded by the shared
+  15-minute deadline, 60-turn and 200-tool ceilings, and
+  `SUBMISSIONS_PER_RESPONSE`.
+
 - `agent.mjs` gives each rule owner its own `@earendil-works/pi-agent-core`
   `Agent`. Its initial context is a compact changed-file index (status, path,
   rename, and line counts), never concatenated diffs. Pi owns the persistent
@@ -31,13 +30,14 @@ under its assigned rule document and decides what repository evidence to inspect
 - `ci-review.mjs` launches the rule-owner sessions in parallel and passes their
   findings into the existing deterministic posting pipeline in `inline.mjs`.
 
-With the five current rule documents, the old production shape was up to
-`60 files × 5 rules × 3 samples = 900` stateless model requests. The new shape is
-exactly **five top-level whole-PR sessions**. A session can make model-directed
-continuations after tool calls, bounded by turn, tool-call, request, and wall-time
-limits; production never creates a model review per changed file. First measured
-production run: 14 changed files, five parallel sessions, 4–22 tool calls each,
-102 seconds end to end.
+The reviewer creates eight top-level whole-PR owner reviews, never one review per changed file. All eight run in one parallel wave. A ninth document fails before model use until the owner and cost contract is changed explicitly.
+
+The eight sessions do not see one another's prompts, tool calls, reasoning, or
+findings and cannot coordinate. Each receives only its assigned rule document in
+the system prompt plus the same repository tools. Repository search can expose
+the other checked-in rule files as ordinary source context; it never exposes
+another live review. Findings meet only after all sessions return, when the
+deterministic posting layer merges related comments.
 
 The launcher does not rank files, create clusters, prescribe traversal order, or
 encode a delegation workflow. Its only orchestration is independent rule-owner
@@ -52,12 +52,10 @@ the review. It exists because the original contract made one terminal JSON carry
 every finding, so a reviewer with a lot to say about a large diff was cut off
 mid-answer and its whole review was discarded.
 
-The truncation that forced this was our own bug, not a provider limit. pi-ai sends
-`max_completion_tokens` for OpenAI-compatible providers outside its allow-list,
-DeepSeek is outside it, and DeepSeek's API reads only `max_tokens` — so every
-ceiling we sent was dropped and DeepSeek's 8192 default stood in for it.
-Requesting 6214 and still stopping at 8192 is what exposed it. The runtime now
-names the field DeepSeek reads and asks for the catalog's own ceiling.
+The runtime asks for the selected model catalog's output ceiling. Provider
+defaults had previously truncated valid multi-tool responses even though the
+review contract allowed more findings; the explicit ceiling keeps the transport
+and finding budgets aligned.
 
 Every request sets `toolChoice: "required"`, so a response can only be tool calls.
 Incremental submission alone did not fix the overflow — reviewers still spent whole
@@ -66,12 +64,13 @@ without ever submitting a finding. Prose was never read by anything; now there i
 no channel for it, which is enforcement rather than instruction.
 
 `submit_finding` is the validation boundary. Pi checks the arguments against the
-finding schema before the tool runs, so a malformed submission comes back as an
-error the reviewer can act on. Beyond the schema, submissions are refused — never
-silently accepted, never fatal — when they cite a file the pull request does not
-change, when they exceed `SUBMISSIONS_PER_RESPONSE` in one response, in which
-case the reviewer is told to re-issue them next turn, or when the submission
-clears its own subject instead of reporting a violation.
+finding schema before the tool runs, then the repository verifies that the cited
+quote occurs on the claimed added line. A malformed or unsupported submission
+comes back as an error the reviewer can act on. Submissions are also refused —
+never silently accepted, never fatal — when they cite a file the pull request
+does not change, when they exceed `SUBMISSIONS_PER_RESPONSE` in one response, in
+which case the reviewer is told to re-issue them next turn, or when the
+submission clears its own subject instead of reporting a violation.
 
 That last one is a refusal because prompting did not stop it. Three prompts say a
 file you inspected and cleared is not part of the review, and reviewers still
@@ -101,9 +100,10 @@ render as prose and are elided.
 A session is complete only after `finish_review` is called, its arguments pass a
 TypeBox schema at the boundary — no hand-rolled shape checks — and its `submitted`
 count equals what actually reached the bank. A dropped SSE stream (`terminated`,
-`other side closed`) is retried once on a fresh session. Provider errors, timeouts,
-aborted runs, exhausted budgets, a session that never closes, a second dropped
-stream, and a count that disagrees with the bank are **incomplete**, never clean.
+`other side closed`) is retried once on a fresh session using only the time left
+inside the owner's single 15-minute deadline. Provider errors, timeouts, aborted
+runs, exhausted budgets, a session that never closes, a second dropped stream,
+and a count that disagrees with the bank are **incomplete**, never clean.
 The close is read off the tool call
 and ends the session there, so closing never depends on when a tool result is
 appended relative to the turn hook.
@@ -171,9 +171,9 @@ Findings land as one advisory GitHub review (`event: COMMENT`), with one thread 
 anchored finding.
 
 - **Anchoring:** the agent supplies an absolute new-file line and exact quote.
-  The line is accepted only when that quote matches an added diff line. Existing
-  quote and snippet-map fallbacks remain for compatibility; unanchorable findings
-  become file-level comments.
+  The submission boundary accepts it only when that quote matches the claimed
+  added diff line, so every banked model finding is anchorable. Existing quote
+  and snippet-map fallbacks remain for non-agent compatibility inputs.
 - **Fallbacks:** file-level failure demotes to the review body; rejected inline
   reviews retry with body findings; a second review failure falls back to the
   summary comment. Findings are not silently dropped.
@@ -184,40 +184,28 @@ anchored finding.
   best-effort GraphQL thread resolution only after a complete review. Bot-resolved
   findings that reappear post fresh.
 
-The GitHub Actions job uses `pull_request`, not `pull_request_target`. Fork PRs do
-not receive the DeepSeek secret or a write token. The job installs the pinned Pi
-runtime with lifecycle scripts disabled before launching the reviewers.
+The GitHub Actions job uses base-owned `pull_request_target` code. It checks out the exact base SHA, fetches `refs/pull/<number>/head` as an object without checking it out, verifies the event head SHA, and exposes head content only through bounded read-only repository tools. Candidate workflow/code never receives the OpenAI secret or write token; validated output can post advisory review comments only.
 
 ## Verification
 
 All local reviewer tests are network-free:
 
 ```bash
-node --test tooling/pr-review/*.test.node.mjs
+node --test test/pr-review/*.test.mjs
 ```
 
-They cover dynamic one-session-per-rule launch over a 240-file index, multi-turn
-changed and unchanged reads, Git-backed repository access and path safety,
-provider/tool/budget failure states, truncation and unparseable-answer
-diagnostics, a stated finding budget that matches the enforced one, a trimmed
-quote that still anchors, a derived output ceiling that still holds a full
-response, 24 findings reported across several responses, a session that dies with
-findings banked, a session that never reaches the completion signal, duplicate
-submission, a submission citing an unchanged file, a submission that fails the
-schema, a terminal count that disagrees with the bank, the per-response cap and
-its re-issue, a reviewer that ends in prose being re-asked once and recovering, a
-reviewer that misses the signal twice staying incomplete, findings surviving a
-re-ask, a reviewer that submits through the whole close allowance still ending
-complete because the close is all it is left, a dropped stream retried once to
-completion, a second drop staying incomplete, a named provider failure not
-retried, a run summary that reports the extra ask and a forced close only when each happened,
-anchoring, fingerprints, dedupe, reconciliation, stale deferral, and posting
-payloads. CI runs this complete set in its unconditional quality job.
+They cover the exact eight-owner budget and one-wave launch over a 240-file index,
+multi-turn changed and unchanged reads, Git-backed repository access and path
+safety, provider/tool/budget failure states, a retry sharing the original owner
+deadline, truncation and unparseable-answer diagnostics, finding-budget
+enforcement, incremental submission, completion signaling, anchoring,
+fingerprints, dedupe, reconciliation, stale deferral, and posting payloads. CI
+runs this complete network-free set in its unconditional quality job.
 
-A local production dry run performs real DeepSeek sessions but no GitHub writes:
+A local production dry run performs real GPT-5.6 Luna sessions but no GitHub writes:
 
 ```bash
-DEEPSEEK_API_KEY=... DRY_RUN=1 \
+OPENAI_API_KEY=... DRY_RUN=1 \
   BASE_SHA=<base> HEAD_SHA=<head> node tooling/pr-review/ci-review.mjs
 ```
 
@@ -226,18 +214,49 @@ against existing comments using read-only GitHub calls.
 
 ## Evaluation
 
-`review.mjs` now evaluates the production autonomous-agent boundary. Each fixture
-is exposed as a one-file pull request with the same repository tools, every rule
+`review.mjs` evaluates the production autonomous-agent boundary. Every fixture
+contains a full changed file in a multi-file base/head repository. Authored cases
+add contract-specific definitions or behavioral callers when their decision
+depends on them; real-source cases expose the full tracked repository. Every rule
 owner gets its own session, and any incomplete session aborts the run rather than
 being scored as a clean prediction.
 
 ```bash
-DEEPSEEK_API_KEY=... DEEPSEEK_MODEL=deepseek-v4-flash \
-  RUNS=5 node tooling/pr-review/review.mjs holdout
-DEEPSEEK_API_KEY=... node tooling/pr-review/review.mjs dev
+OPENAI_API_KEY=... OPENAI_MODEL=gpt-5.6-luna \
+  OPENAI_REASONING=high node tooling/pr-review/review.mjs blind
+OPENAI_API_KEY=... OPENAI_REASONING=high node tooling/pr-review/review.mjs dev
+OPENAI_API_KEY=... OPENAI_REASONING=high node tooling/pr-review/review.mjs holdout
 ```
 
-The former 99.0% F1 / 98.1% precision / 100% recall numbers measured the removed
-per-file majority-of-three architecture. They are historical and are not claimed
-for the autonomous reviewer. The fixture corpus remains available, but the new
-architecture must establish its own baseline through the agentic harness above.
+High reasoning is the production default. `OPENAI_REASONING=off` reproduces the
+disabled-reasoning control. `CASE_IDS=id-a,id-b` limits a diagnostic run to
+explicit fixtures; `PAIR_IDS=case-a:owner-a,case-b:owner-b` selects exact
+owner/case decisions. Flex is the default service tier. Set
+`OPENAI_SERVICE_TIER=default` to request standard processing from the start;
+Flex resource exhaustion falls back automatically.
+
+A balanced 16-pair diagnostic (one positive and one clean case per owner, three
+runs each) measured reasoning off at P=63.9%, R=95.8%, F1=76.7% and high at
+P=66.7%, R=100%, F1=80.0%. This supports the high-reasoning default but is not a
+replacement for a complete corpus run.
+
+After making each owner scope a hard eligibility gate, clarifying the general
+rules, completing authored repository context, narrowing real-source diffs to
+the reviewed subject, and labeling genuine cross-owner violations exhaustively,
+the first complete high-reasoning run over the frozen blind corpus measured
+P=73.1%, R=100%, F1=84.4% across 192 owner decisions. No prompt, rule, fixture, or
+label changed in response to that run. Development and the historically named
+holdout were used only as calibration data. Incomplete rate-limited runs are
+aborted and never included in scores.
+
+The evaluator prints micro and per-owner precision, recall, and F1. Development
+and historical holdout cases are calibration data. `cases.blind.mjs` is frozen
+before its first model run; its materialized repositories are guarded by
+`cases.blind.sha256`. If they ever inform prompt, rule, fixture, or label changes,
+the corpus must be retired and replaced before another generalization claim.
+Results count only when every owner completes.
+
+The committed corpora have 36 development, 43 historical holdout, and 24 blind
+fixtures. With eight owners, one run performs 288, 344, and 192 owner evaluations
+respectively. A retryable transport drop can add at most one provider session to
+an owner evaluation without resetting its limits.

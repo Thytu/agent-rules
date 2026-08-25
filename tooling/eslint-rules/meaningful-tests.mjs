@@ -1,4 +1,4 @@
-// The mechanical subset of the test rule (docs/rules/engineering.md → Tests). A test
+// The mechanical subset of docs/rules/testing.md. A test
 // that asserts nothing, only asserts mock calls, snapshots to a file, checks an
 // imported constant against its own literal, or mocks a sibling module can
 // never catch a regression — it re-proves the implementation to itself.
@@ -64,15 +64,15 @@ export const meaningfulTests = {
 		schema: [],
 		messages: {
 			noAssertions:
-				"Test has no expect() — it can never fail, so it proves nothing. Assert an observable outcome (return value, thrown error, response, DB state). See docs/rules/engineering.md → Tests.",
+				"Test has no expect() — it can never fail, so it proves nothing. Assert an observable outcome (return value, thrown error, response, DB state). See docs/rules/testing.md.",
 			callAssertionsOnly:
-				"Every assertion here is a mock-call check — that verifies wiring, not behavior, and passes while the behavior is broken. Add an outcome assertion; call checks may only corroborate it. See docs/rules/engineering.md → Tests.",
+				"Every assertion here is a mock-call check — that verifies wiring, not behavior, and passes while the behavior is broken. Add an outcome assertion; call checks may only corroborate it. See docs/rules/testing.md.",
 			externalSnapshot:
-				"File snapshots are banned — they rubber-stamp whatever the code produced. Use an explicit assertion, or toMatchInlineSnapshot only where the full wire shape IS the contract. See docs/rules/engineering.md → Tests.",
+				"File snapshots are banned — they rubber-stamp whatever the code produced. Use an explicit assertion, or toMatchInlineSnapshot only where the full wire shape IS the contract. See docs/rules/testing.md.",
 			importedLiteral:
-				"This asserts an imported constant contains its own source literal — it fires on every deliberate edit and catches nothing. Test behavior (shape, leak, budget invariants), not copy. See docs/rules/engineering.md → Tests.",
+				"This asserts an imported constant contains its own source literal — it fires on every deliberate edit and catches nothing. Test behavior (shape, leak, budget invariants), not copy. See docs/rules/testing.md.",
 			siblingMock:
-				"vi.mock of a local module fakes the thing you should be testing. Mock only process boundaries (providers, third-party SDKs, the clock); use the real module or promote to an integration test against real D1. See docs/rules/engineering.md → Tests.",
+				"vi.mock of a local module fakes the thing you should be testing. Mock only process boundaries (providers, third-party SDKs, the clock); use the real module or promote to an integration test. See docs/rules/testing.md.",
 		},
 	},
 	create(context) {
@@ -81,6 +81,21 @@ export const meaningfulTests = {
 			CallExpression(node) {
 				if (isTestCall(node)) {
 					testStack.push({ node, expects: 0, nonCallExpects: 0 });
+					return;
+				}
+				const current = testStack[testStack.length - 1];
+				const directAssert =
+					node.callee.type === "Identifier" && node.callee.name === "assert";
+				const assertionMember =
+					node.callee.type === "MemberExpression" &&
+					node.callee.object.type === "Identifier" &&
+					(node.callee.object.name === "assert" ||
+						(node.callee.object.name === "ruleTester" &&
+							node.callee.property.type === "Identifier" &&
+							node.callee.property.name === "run"));
+				if (current && (directAssert || assertionMember)) {
+					current.expects += 1;
+					current.nonCallExpects += 1;
 					return;
 				}
 				if (
@@ -102,10 +117,11 @@ export const meaningfulTests = {
 				}
 				const chain = expectChain(node);
 				if (!chain) return;
-				const current = testStack[testStack.length - 1];
-				if (current) {
-					current.expects += 1;
-					if (!CALL_MATCHERS.has(chain.matcher)) current.nonCallExpects += 1;
+				const currentExpectation = testStack[testStack.length - 1];
+				if (currentExpectation) {
+					currentExpectation.expects += 1;
+					if (!CALL_MATCHERS.has(chain.matcher))
+						currentExpectation.nonCallExpects += 1;
 				}
 				if (
 					chain.matcher === "toMatchSnapshot" ||

@@ -1,0 +1,6 @@
+# Generated tools
+.agent-rules/tools/
+
+# OS and editor
+.DS_Store
+*.swp

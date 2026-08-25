@@ -1,12 +1,7 @@
-// Full-coverage reviewer: one focused agent per rule doc in docs/rules/. The set
-// is DISCOVERED, not hand-listed — drop a rule doc in docs/rules/ and it gets a
-// reviewer; delete one and it's gone. Each agent loads its doc VERBATIM at review
-// time as the source of truth, so the rules can never drift from the md files and
-// coverage is provably the union of docs/rules/.
-//
-// Purely-procedural rules (git append-only, squash-merge, verify-before-commit)
-// aren't checkable from a PR diff and stay hook/CI-enforced — they aren't docs
-// here by design.
+// Full-coverage reviewer: one focused agent per top-level docs/rules document.
+// Every owner loads its document verbatim and reviews the whole pull request.
+// The fixed budget prevents an added file from silently increasing production
+// and evaluation model calls.
 import { readdirSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -14,10 +9,21 @@ import { fileURLToPath } from "node:url";
 const HERE = dirname(fileURLToPath(import.meta.url));
 export const REPO_ROOT = join(HERE, "..", "..");
 export const RULES_DIR = join(REPO_ROOT, "docs", "rules");
+export const OWNER_BUDGET = 8;
 
-export function loadAgents() {
-	return readdirSync(RULES_DIR)
-		.filter((f) => f.endsWith(".md"))
-		.sort()
-		.map((f) => ({ id: f.replace(/\.md$/, ""), doc: `docs/rules/${f}` }));
+export function loadAgents(root = REPO_ROOT) {
+	const rulesDir = root === REPO_ROOT ? RULES_DIR : join(root, "docs", "rules");
+	const agents = readdirSync(rulesDir)
+		.filter((file) => file.endsWith(".md"))
+		.map((file) => ({
+			id: file.replace(/\.md$/, ""),
+			doc: `docs/rules/${file}`,
+		}))
+		.sort((left, right) => left.id.localeCompare(right.id));
+	if (agents.length !== OWNER_BUDGET) {
+		throw new Error(
+			`rule owner count ${agents.length} does not match declared budget ${OWNER_BUDGET}`,
+		);
+	}
+	return agents;
 }

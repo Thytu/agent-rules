@@ -1,19 +1,29 @@
-## Decision record
+# Pull request
 
-The branch dies at squash-merge. Every decision made on it lives here — if it
-isn't in this body, it's gone.
+> **Outcome:** <!-- One sentence describing what a repository owner can now do or observe. -->
 
--
+## Decision
 
-## Scenarios walked
+<!-- Use one to three short paragraphs. Describe behavior and rationale, never file paths. -->
 
-Re-walk every scenario whose `touches:` names a changed artifact. Concrete
-artifact per step, not a mechanism name.
+| Surface or contract | Before | After |
+|---|---|---|
+| <!-- Name the behavior, schema, or procedure. --> | <!-- Previous state. --> | <!-- New state. --> |
 
-- none
+---
 
-## Verify
+## Verification
 
-What you ran against the real thing.
+| Procedure | Evidence |
+|---|---|
+| Source gate | <!-- Exact command and observed result. --> |
+| Generated modes | <!-- Modes exercised and their observed results. --> |
+| Repository-owner behavior | <!-- Real workflow exercised end to end. --> |
 
--
+---
+
+## Risks
+
+| Risk | Bound |
+|---|---|
+| <!-- Migration, security, compatibility, or operations. --> | <!-- Prevention, containment, or recovery. --> |

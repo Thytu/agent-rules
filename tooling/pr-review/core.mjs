@@ -3,8 +3,14 @@
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { createModels } from "@earendil-works/pi-ai";
-import { deepseekProvider } from "@earendil-works/pi-ai/providers/deepseek";
+import { openaiProvider } from "@earendil-works/pi-ai/providers/openai";
 import { loadAgents, REPO_ROOT } from "./agents.mjs";
+
+export const DEFAULT_BASE_URL = "https://api.openai.com/v1";
+export const DEFAULT_MODEL = "gpt-5.6-luna";
+export const DEFAULT_SERVICE_TIER = "flex";
+export const DEFAULT_REASONING = "high";
+const STANDARD_SERVICE_TIER = "default";
 
 // Per-field ceilings for one finding. The prompt states these numbers and the
 // submit_finding boundary enforces them, so a reviewer is never told one contract
@@ -17,21 +23,12 @@ export const FINDING_LIMITS = { quote: 240, rule: 100, why: 240 };
 // cap, the extra submissions are refused with a reason and re-issued next turn.
 export const SUBMISSIONS_PER_RESPONSE = 10;
 
-// The catalog's own output ceiling, not a number invented here. The 8192 that
-// looked like a provider limit was our own bug: pi-ai sends max_completion_tokens
-// for DeepSeek, DeepSeek's API only reads max_tokens, so the value never arrived
-// and its 8192 default applied — asking for 6214 still stopped at 8192.
+// Use the catalog's own output ceiling. A smaller local guess can truncate a
+// valid response containing the full per-response finding allowance.
+
 export function requestCeiling(model) {
 	return model?.maxTokens;
 }
-
-export const WRAPPER = `You are a strict senior code reviewer for this repository. Below is ONE of the repo's rule documents — it is your sole source of truth. Review the entire pull request for violations of rules stated IN THIS DOCUMENT ONLY. Other reviewers independently own the other rule documents; lint and CI own mechanical checks. Do not comment on style or taste.
-
-Your review gates merges, so a false positive is expensive. Investigate repository context when needed, but only report a concrete violation introduced by the pull request that you can defend by quoting this rule document and exact changed code. Descriptive material and rules whose required context cannot be established are not findings. The absence of something is only a finding when this document explicitly requires it for this kind of change.
-
-Choose your own investigation order and breadth. Use the read-only repository tools to inspect changed diffs, changed or unchanged files, definitions, callers, tests, and schema. The changed-file index is orientation, not source evidence. Finish only after you have reviewed the pull request as a whole under this document.
-
-Report each violation with a submit_finding call the moment you are sure of it, and never hold findings back to list them at the end. Submissions are banked as you make them, so a review cut short still delivers everything it had already proved. Every turn you take is either tool calls or the final completion signal — never a plan, a status note, a running commentary, or a summary of what you just read. Never restate, paraphrase, or quote back this rule document: the reader already has it. Files you inspected and cleared are not part of the review; only violations are. Nothing you write outside submit_finding calls and the final signal is read by anyone. Investigate as widely as the pull request demands.`;
 
 export function extractJson(text) {
 	try {
@@ -52,12 +49,19 @@ export function extractJson(text) {
 
 export async function loadSystems() {
 	const agents = loadAgents();
+	const wrapper = (
+		await readFile(new URL("./system.md", import.meta.url), "utf8")
+	).trimEnd();
 	const systems = new Map();
 	for (const agent of agents) {
 		const doc = await readFile(join(REPO_ROOT, agent.doc), "utf8");
+		if (!/^## Review scope$/m.test(doc))
+			throw new Error(
+				`${agent.doc} is missing its required Review scope section`,
+			);
 		systems.set(
 			agent.id,
-			`${WRAPPER}\n\n=== RULE DOCUMENT: ${agent.doc} ===\n\n${doc}`,
+			`${wrapper}\n\n=== RULE DOCUMENT: ${agent.doc} ===\n\n${doc}`,
 		);
 	}
 	return { agents, systems };
@@ -65,40 +69,102 @@ export async function loadSystems() {
 
 const REQ_TIMEOUT_MS = Number(process.env.REQ_TIMEOUT_MS ?? 60000);
 
+async function isFlexResourceUnavailable(response) {
+	if (response.status !== 429) return false;
+	try {
+		const payload = await response.clone().json();
+		const error = payload?.error ?? {};
+		return (
+			error.code === "resource_unavailable" ||
+			/resource unavailable/i.test(String(error.message ?? ""))
+		);
+	} catch {
+		return false;
+	}
+}
+
+// OpenAI documents 429 resource_unavailable as Flex capacity exhaustion and
+// recommends retrying the same request with standard processing. Other 429s
+// remain rate-limit failures; authentication and validation failures never
+// change tier.
+export function createFlexFallbackFetch(fetchFn = globalThis.fetch) {
+	return async (input, init) => {
+		const response = await fetchFn(input, init);
+		if (!(await isFlexResourceUnavailable(response))) return response;
+		if (typeof init?.body !== "string") return response;
+
+		try {
+			const payload = JSON.parse(init.body);
+			if (payload.service_tier !== "flex") return response;
+			return fetchFn(input, {
+				...init,
+				body: JSON.stringify({
+					...payload,
+					service_tier: STANDARD_SERVICE_TIER,
+				}),
+			});
+		} catch {
+			return response;
+		}
+	};
+}
+
 // Pi forwards a max-output value only when maxTokens is set; with none, the
-// provider's own default truncates a reviewer mid-response.
-export function streamOptions({ key, temperature, model, options = {} }) {
+// provider's own default can truncate a reviewer mid-response.
+export function streamOptions({
+	key,
+	temperature,
+	model,
+	serviceTier,
+	fetchFn,
+	options = {},
+}) {
 	return {
 		...options,
 		apiKey: key,
 		temperature,
 		maxTokens: options.maxTokens ?? requestCeiling(model),
+		...(serviceTier ? { serviceTier: options.serviceTier ?? serviceTier } : {}),
+		...(fetchFn ? { fetch: options.fetch ?? fetchFn } : {}),
 		timeoutMs: REQ_TIMEOUT_MS,
 		maxRetries: 3,
 	};
 }
 
-export function makeRuntime({ key, base, model, temperature }) {
+export function makeRuntime({
+	key,
+	base = DEFAULT_BASE_URL,
+	model = DEFAULT_MODEL,
+	temperature,
+	serviceTier = DEFAULT_SERVICE_TIER,
+	reasoning = DEFAULT_REASONING,
+	fetchFn = globalThis.fetch,
+}) {
+	if (
+		!["off", "minimal", "low", "medium", "high", "xhigh", "max"].includes(
+			reasoning,
+		)
+	)
+		throw new Error(`Unsupported reasoning level: ${reasoning}`);
+	if (!["flex", "auto", "default"].includes(serviceTier))
+		throw new Error(`Unsupported OpenAI service tier: ${serviceTier}`);
+
 	const models = createModels();
-	models.setProvider(deepseekProvider());
-	const catalogModel = models.getModel("deepseek", model);
-	const template =
-		catalogModel ?? models.getModel("deepseek", "deepseek-v4-flash");
-	if (!template) throw new Error(`DeepSeek model is unavailable: ${model}`);
+	models.setProvider(openaiProvider());
+	const catalogModel = models.getModel("openai", model);
+	const template = catalogModel ?? models.getModel("openai", DEFAULT_MODEL);
+	if (!template) throw new Error(`OpenAI model is unavailable: ${model}`);
 	const activeModel = {
 		...template,
 		id: model,
 		name: catalogModel?.name ?? model,
 		baseUrl: base,
-		// pi-ai picks max_completion_tokens for every OpenAI-compatible provider
-		// not on its allow-list, and DeepSeek is not on it. DeepSeek's API reads
-		// max_tokens only, so the ceiling silently never arrived and its 8192
-		// default stood in for it. Name the field DeepSeek actually reads.
-		compat: { ...template.compat, maxTokensField: "max_tokens" },
 	};
+	const requestFetch =
+		serviceTier === "flex" ? createFlexFallbackFetch(fetchFn) : fetchFn;
 
 	async function api(path, init) {
-		const response = await fetch(`${base}${path}`, {
+		const response = await fetchFn(`${base}${path}`, {
 			signal: AbortSignal.timeout(REQ_TIMEOUT_MS),
 			...init,
 			headers: {
@@ -116,16 +182,25 @@ export function makeRuntime({ key, base, model, temperature }) {
 
 	return {
 		model: activeModel,
+		serviceTier,
+		reasoning,
 		api,
 		streamFn(selectedModel, context, options = {}) {
-			return models.streamSimple(
+			const { reasoning: requestedReasoning = reasoning, ...providerOptions } =
+				options;
+			return models.stream(
 				selectedModel,
 				context,
 				streamOptions({
 					key,
 					temperature,
 					model: selectedModel ?? activeModel,
-					options,
+					serviceTier,
+					fetchFn: requestFetch,
+					options: {
+						...providerOptions,
+						reasoningEffort: requestedReasoning,
+					},
 				}),
 			);
 		},

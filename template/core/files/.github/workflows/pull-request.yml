@@ -1,0 +1,18 @@
+name: Pull request policy
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, edited]
+
+permissions:
+  contents: read
+
+jobs:
+  require-base-main:
+    name: PR targets main
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require main base
+        env:
+          BASE_REF: ${{ github.event.pull_request.base.ref }}
+        run: test "$BASE_REF" = main || { echo "::error::PR must target main"; exit 1; }

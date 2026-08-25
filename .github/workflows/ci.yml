@@ -5,111 +5,30 @@ on:
     branches: [main]
   pull_request:
 
+permissions:
+  contents: read
+
 concurrency:
-  group: ci-${{ github.workflow }}-${{ github.ref }}
+  group: quality-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
-  # Every PR MUST target main. No stacked PRs onto integration/* or any other
-  # branch: a PR based on unmerged work auto-closes if its base merges first
-  # (and its commits silently ride along in whatever else descends from it).
-  # Keeps history flat and every PR independently reviewable+mergeable.
-  require-base-main:
-    if: github.event_name == 'pull_request'
+  quality:
+    name: Repository quality
     runs-on: ubuntu-latest
     steps:
-      - name: PRs must target main
-        if: github.base_ref != 'main'
-        run: |
-          echo "::error::This PR targets '${{ github.base_ref }}', not 'main'. Change the PR base to main."
-          exit 1
-
-  # Server-side twin of scripts/guard-shared.sh: pre-commit hooks are bypassable
-  # (--no-verify), this is not. Fails any PR from a feature branch that touches
-  # an integration-owned shared file. The integration owner ships those changes
-  # on branches prefixed `integration/` (or direct pushes to main).
-  # Keep this regex in lockstep with scripts/guard-shared.sh.
-  guard-shared-files:
-    if: github.event_name == 'pull_request' && !startsWith(github.head_ref, 'integration/')
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
-          fetch-depth: 0
-      - name: Block integration-owned file changes
-        run: |
-          changed="$(git diff --name-only "origin/${{ github.base_ref }}"...HEAD)"
-          if printf '%s\n' "$changed" | grep -Eq \
-            '^(package\.json|pnpm-lock\.yaml)$'; then
-            echo "::error::This branch edits an integration-owned shared file (package.json / lockfile)."
-            echo "::error::Request the change from the integration owner, or ship it on an integration/* branch."
-            exit 1
-          fi
-
-  # DeepSeek code review (advisory, comment-only — the review event is always
-  # COMMENT). Posts findings as one review with inline comments; posting model
-  # and reconcile semantics: tooling/pr-review/README.md. Security boundary:
-  # `pull_request` trigger (NOT pull_request_target) — fork PRs never receive
-  # the secret or write token (guard green-skips).
-  ai-review:
-    if: github.event_name == 'pull_request'
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
-    permissions:
-      contents: read
-      pull-requests: write
-    steps:
-      - name: Guard — review only when configured
-        id: guard
-        env:
-          DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
-        run: |
-          if [ -z "${DEEPSEEK_API_KEY}" ]; then
-            echo "::warning::AI review skipped — set the DEEPSEEK_API_KEY repo secret to enable it."
-            echo "go=false" >> "$GITHUB_OUTPUT"
-          else
-            echo "go=true" >> "$GITHUB_OUTPUT"
-          fi
-      - uses: actions/checkout@v4
-        if: steps.guard.outputs.go == 'true'
+          persist-credentials: false
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1
         with:
-          fetch-depth: 0
-      - uses: pnpm/action-setup@v4
-        if: steps.guard.outputs.go == 'true'
-      - uses: actions/setup-node@v4
-        if: steps.guard.outputs.go == 'true'
+          version: 10.20.0
+          run_install: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
-          node-version: 22
+          node-version: 22.22.0
           cache: pnpm
-      - run: pnpm install --frozen-lockfile --ignore-scripts
-        if: steps.guard.outputs.go == 'true'
-      - name: Review the diff
-        if: steps.guard.outputs.go == 'true'
-        env:
-          DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
-          GH_TOKEN: ${{ github.token }}
-          REPO: ${{ github.repository }}
-          PR_NUMBER: ${{ github.event.pull_request.number }}
-          BASE_SHA: ${{ github.event.pull_request.base.sha }}
-          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
-        run: node tooling/pr-review/ci-review.mjs
-
-  quality-checks:
-    name: quality checks
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: pnpm
-      - run: pnpm install --frozen-lockfile
-      - name: Map
-        run: bash scripts/check-map.sh
-      - name: Format
-        run: pnpm format:check
-      - name: Lint
-        run: pnpm lint
-      - name: Test tooling
-        run: pnpm test:tooling
+      - name: Set up source checkout
+        run: bash scripts/setup-source.sh --ci
+      - name: Verify source and all generator contracts
+        run: pnpm verify

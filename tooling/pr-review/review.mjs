@@ -1,23 +1,54 @@
-// Evaluation harness for the production agent boundary. Every fixture is exposed
-// as a one-file pull request, and every dynamically discovered rule owner reviews
-// it through the same Pi agent harness used by ci-review.mjs.
+// Evaluation harness for the production agent boundary. Every fixture provides
+// a multi-file base/head repository snapshot, and every dynamically discovered
+// rule owner reviews it through the same Pi agent harness used by ci-review.mjs.
 //
-//   DEEPSEEK_API_KEY=... node review.mjs [dev|holdout]   RUNS=5 to average
-//   DEEPSEEK_API_KEY=... node review.mjs models
+//   OPENAI_API_KEY=... OPENAI_REASONING=high node review.mjs [dev|holdout|blind]
+//   OPENAI_API_KEY=... node review.mjs models
+import { verifyBlindCorpus } from "./blind-integrity.mjs";
 import { runRuleReviewer } from "./agent.mjs";
-import { loadSystems, makeRuntime, pool } from "./core.mjs";
+import {
+	DEFAULT_BASE_URL,
+	DEFAULT_MODEL,
+	DEFAULT_REASONING,
+	DEFAULT_SERVICE_TIER,
+	loadSystems,
+	makeRuntime,
+	pool,
+} from "./core.mjs";
+import { createFixtureRepository } from "./fixture-repository.mjs";
 
-const KEY = process.env.DEEPSEEK_API_KEY;
-const BASE = process.env.DEEPSEEK_BASE_URL || "https://api.deepseek.com";
-const MODEL = process.env.DEEPSEEK_MODEL || "deepseek-v4-flash";
-const TEMPERATURE = Number(process.env.TEMPERATURE ?? 0);
+const KEY = process.env.OPENAI_API_KEY;
+const BASE = process.env.OPENAI_BASE_URL || DEFAULT_BASE_URL;
+const MODEL = process.env.OPENAI_MODEL || DEFAULT_MODEL;
+const SERVICE_TIER = process.env.OPENAI_SERVICE_TIER || DEFAULT_SERVICE_TIER;
+const REASONING = process.env.OPENAI_REASONING || DEFAULT_REASONING;
+const TEMPERATURE =
+	process.env.TEMPERATURE === undefined
+		? undefined
+		: Number(process.env.TEMPERATURE);
 const CONC = Number(process.env.CONC ?? 8);
 const RUNS = Number(process.env.RUNS ?? 1);
+if (!Number.isInteger(CONC) || CONC < 1)
+	throw new Error("CONC must be a positive integer");
+if (!Number.isInteger(RUNS) || RUNS < 1)
+	throw new Error("RUNS must be a positive integer");
+const CASE_IDS = new Set(
+	String(process.env.CASE_IDS ?? "")
+		.split(",")
+		.map((id) => id.trim())
+		.filter(Boolean),
+);
+const PAIR_IDS = new Set(
+	String(process.env.PAIR_IDS ?? "")
+		.split(",")
+		.map((id) => id.trim())
+		.filter(Boolean),
+);
 
 const expectedAgents = (testCase) => new Set(testCase.violations ?? []);
 
 if (!KEY) {
-	console.error("DEEPSEEK_API_KEY is not set.");
+	console.error("OPENAI_API_KEY is not set.");
 	process.exit(1);
 }
 
@@ -26,6 +57,8 @@ const runtime = makeRuntime({
 	base: BASE,
 	model: MODEL,
 	temperature: TEMPERATURE,
+	serviceTier: SERVICE_TIER,
+	reasoning: REASONING,
 });
 
 if (process.argv[2] === "models") {
@@ -35,74 +68,48 @@ if (process.argv[2] === "models") {
 	process.exit(0);
 }
 
-const which = process.argv[2] === "holdout" ? "holdout" : "dev";
-const { cases } = await import(
-	which === "holdout" ? "./cases.holdout.mjs" : "./cases.mjs"
-);
-
-function fixtureRepository(testCase) {
-	const lines = String(testCase.code).split("\n");
-	const diff = [
-		`diff --git a/${testCase.file} b/${testCase.file}`,
-		"new file mode 100644",
-		"--- /dev/null",
-		`+++ b/${testCase.file}`,
-		`@@ -0,0 +1,${lines.length} @@`,
-		...lines.map((line) => `+${line}`),
-	].join("\n");
-	const numbered = lines
-		.map((line, index) => `${index + 1}: ${line}`)
-		.join("\n");
-	return {
-		baseSha: "fixture-base",
-		headSha: "fixture-head",
-		changes: [
-			{
-				status: "A",
-				path: testCase.file,
-				additions: lines.length,
-				deletions: 0,
-			},
-		],
-		async executeTool(name, args = {}) {
-			if (name === "get_changed_file_diff" && args.path === testCase.file)
-				return { ok: true, path: testCase.file, content: diff };
-			if (name === "read_file" && args.path === testCase.file)
-				return { ok: true, path: testCase.file, content: numbered };
-			if (name === "search_repository") {
-				const query = String(args.query ?? "").toLowerCase();
-				return {
-					ok: true,
-					matches: lines.flatMap((line, index) =>
-						line.toLowerCase().includes(query)
-							? [{ path: testCase.file, line: index + 1, text: line }]
-							: [],
-					),
-				};
-			}
-			if (name === "list_repository")
-				return { ok: true, paths: [testCase.file] };
-			return { ok: false, error: "fixture path or tool not found" };
-		},
-	};
-}
+const requestedSet = process.argv[2];
+const which = ["dev", "holdout", "blind"].includes(requestedSet)
+	? requestedSet
+	: "dev";
+const modules = {
+	dev: "./cases.mjs",
+	holdout: "./cases.holdout.mjs",
+	blind: "./cases.blind.mjs",
+};
+if (which === "blind") await verifyBlindCorpus();
+if (which === "blind" && (CASE_IDS.size > 0 || PAIR_IDS.size > 0))
+	throw new Error("blind evaluation must run the complete frozen corpus");
+const { cases: allCases } = await import(modules[which]);
+const cases = CASE_IDS.size
+	? allCases.filter((testCase) => CASE_IDS.has(testCase.id))
+	: allCases;
+if (CASE_IDS.size && cases.length !== CASE_IDS.size)
+	throw new Error("CASE_IDS names an unknown or duplicate fixture");
 
 async function reviewFixture(agent, system, testCase) {
 	return runRuleReviewer({
 		agent,
 		system,
-		repository: fixtureRepository(testCase),
+		repository: createFixtureRepository(testCase),
 		runtime,
 	});
 }
 
 const { agents, systems } = await loadSystems();
-console.log(
-	`set=${which} model=${MODEL} temp=${TEMPERATURE} runs=${RUNS} architecture=whole-pr-agent agents=[${agents.map((agent) => agent.id).join(", ")}] cases=${cases.length}\n`,
-);
 
-const pairs = cases.flatMap((testCase) =>
+const allPairs = cases.flatMap((testCase) =>
 	agents.map((agent) => ({ testCase, agent })),
+);
+const pairs = PAIR_IDS.size
+	? allPairs.filter(({ testCase, agent }) =>
+			PAIR_IDS.has(`${testCase.id}:${agent.id}`),
+		)
+	: allPairs;
+if (PAIR_IDS.size && pairs.length !== PAIR_IDS.size)
+	throw new Error("PAIR_IDS names an unknown or duplicate case:owner pair");
+console.log(
+	`set=${which} model=${MODEL} reasoning=${REASONING} temp=${TEMPERATURE} runs=${RUNS} architecture=whole-pr-agent agents=[${agents.map((agent) => agent.id).join(", ")}] cases=${cases.length} pairs=${pairs.length}\n`,
 );
 const pct = (value) => (value * 100).toFixed(1);
 const prf = (tp, fp, fn) => {
@@ -177,9 +184,13 @@ const mean = prf(sumTP, sumFP, sumFN);
 console.log(
 	`\nmicro-avg over ${RUNS} run(s): P=${pct(mean.precision)}%  R=${pct(mean.recall)}%  F1=${pct(mean.f1)}%`,
 );
-console.log("\nper-agent (tp/fp/fn):");
-for (const [id, scores] of Object.entries(perAgent))
-	console.log(`  ${id.padEnd(12)} ${scores.tp}/${scores.fp}/${scores.fn}`);
+console.log("\nper-agent:");
+for (const [id, scores] of Object.entries(perAgent)) {
+	const metrics = prf(scores.tp, scores.fp, scores.fn);
+	console.log(
+		`  ${id.padEnd(26)} TP=${scores.tp} FP=${scores.fp} FN=${scores.fn} P=${pct(metrics.precision)}% R=${pct(metrics.recall)}% F1=${pct(metrics.f1)}%`,
+	);
+}
 
 if (fpCount.size) {
 	console.log("\nfalse positives (case:agent → runs/total):");

@@ -1,0 +1,38 @@
+{
+	"name": "generated-product",
+	"version": "0.0.0",
+	"private": true,
+	"type": "module",
+	"engines": {
+		"node": "22.22.0"
+	},
+	"packageManager": "pnpm@10.20.0",
+	"scripts": {
+		"format": "biome format --write .",
+		"format:check": "biome format .",
+		"lint": "eslint .",
+		"typecheck": "tsc --noEmit",
+		"test": "node --import=tsx --test 'test/eslint/**/*.test.mjs' 'test/**/*.test.ts' 'test/**/*.test.tsx'",
+		"audit": "pnpm audit --audit-level high",
+		"unused": "knip"
+	},
+	"devDependencies": {
+		"@biomejs/biome": "2.5.7",
+		"@eslint/js": "9.39.5",
+		"@types/node": "22.20.1",
+		"eslint": "9.39.5",
+		"globals": "17.9.0",
+		"knip": "6.32.2",
+		"typescript": "5.9.3",
+		"tsx": "4.23.12",
+		"typescript-eslint": "8.66.0"
+	},
+	"knip": {
+		"entry": [
+			"test/**/*.{mjs,ts,tsx}"
+		],
+		"project": [
+			"types/**/*.d.ts"
+		]
+	}
+}
