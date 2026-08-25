@@ -1,7 +1,4 @@
 .agent-rules/
-.agent-rules/guarded-paths/
-.agent-rules/guarded-paths/core.txt
-.agent-rules/guarded-paths/typescript.txt
 .githooks/
 .githooks/commit-msg
 .githooks/pre-commit
@@ -12,7 +9,7 @@
 .github/PULL_REQUEST_TEMPLATE.md
 .github/workflows/
 .github/workflows/ci.yml
-.github/workflows/guard.yml
+.github/workflows/pull-request.yml
 .gitignore
 .npmrc
 AGENTS.md
@@ -35,10 +32,8 @@ eslint.config.mjs
 package.json
 pnpm-lock.yaml
 scripts/
-scripts/authorize-changes.sh
 scripts/commit-msg.sh
 scripts/guard-append-only.sh
-scripts/guard-shared.sh
 scripts/setup-github.sh
 scripts/setup-typescript.sh
 scripts/setup.sh

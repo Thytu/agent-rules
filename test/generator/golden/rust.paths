@@ -1,7 +1,4 @@
 .agent-rules/
-.agent-rules/guarded-paths/
-.agent-rules/guarded-paths/core.txt
-.agent-rules/guarded-paths/rust.txt
 .cargo/
 .cargo/config.toml
 .githooks/
@@ -14,7 +11,7 @@
 .github/PULL_REQUEST_TEMPLATE.md
 .github/workflows/
 .github/workflows/ci.yml
-.github/workflows/guard.yml
+.github/workflows/pull-request.yml
 .gitignore
 AGENTS.md
 CLAUDE.md
@@ -38,10 +35,8 @@ docs/rules/testing.md
 rust-toolchain.toml
 rustfmt.toml
 scripts/
-scripts/authorize-changes.sh
 scripts/commit-msg.sh
 scripts/guard-append-only.sh
-scripts/guard-shared.sh
 scripts/setup-github.sh
 scripts/setup-rust.sh
 scripts/setup.sh

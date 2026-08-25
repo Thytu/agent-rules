@@ -8,33 +8,6 @@ import { test } from "node:test";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 
-function authorize(t, paths, env) {
-	const dir = mkdtempSync(join(tmpdir(), "agent-rules-auth-"));
-	t.after(() => rmSync(dir, { recursive: true, force: true }));
-	const changed = join(dir, "changed");
-	writeFileSync(
-		changed,
-		Buffer.from(paths.map((path) => `${path}\0`).join("")),
-	);
-	return spawnSync(
-		"bash",
-		["template/core/files/scripts/authorize-changes.sh", "--source", changed],
-		{
-			cwd: root,
-			encoding: "utf8",
-			env: {
-				...process.env,
-				HEAD_REPO: "org/repo",
-				BASE_REPO: "org/repo",
-				ACTOR: "contributor",
-				HEAD_REF: "feature/change",
-				INTEGRATION_OWNER: "owner",
-				...env,
-			},
-		},
-	);
-}
-
 test("pull request templates require visual behavior summaries", () => {
 	const templates = [
 		readFileSync(join(root, ".github", "PULL_REQUEST_TEMPLATE.md"), "utf8"),
@@ -60,45 +33,6 @@ test("pull request templates require visual behavior summaries", () => {
 	}
 });
 
-test("only the exact integration owner may change policy", (t) => {
-	const owner = authorize(t, [".github/workflows/ci.yml"], {
-		ACTOR: "owner",
-		HEAD_REF: "integration/policy",
-	});
-	assert.equal(owner.status, 0);
-	const spoof = authorize(t, [".github/workflows/ci.yml"], {
-		ACTOR: "contributor",
-		HEAD_REF: "integration/policy",
-	});
-	assert.notEqual(spoof.status, 0);
-	assert.match(spoof.stderr, /unauthorized integration-owned source path/);
-});
-test("source workflow policy requires integration ownership", (t) => {
-	const workflowPolicy = authorize(t, ["README.md"], {});
-	assert.notEqual(workflowPolicy.status, 0);
-	assert.match(
-		workflowPolicy.stderr,
-		/unauthorized integration-owned source path/,
-	);
-});
-
-test("opt-in Dependabot remediation is limited to manifests and locks", (t) => {
-	const allowed = authorize(t, ["package.json", "pnpm-lock.yaml"], {
-		ACTOR: "dependabot[bot]",
-		HEAD_REF: "dependabot/npm/update",
-	});
-	assert.equal(allowed.status, 0);
-	const policy = authorize(t, ["package.json", ".github/workflows/ci.yml"], {
-		ACTOR: "dependabot[bot]",
-		HEAD_REF: "dependabot/npm/update",
-	});
-	assert.notEqual(policy.status, 0);
-});
-
-test("ordinary product paths do not require integration ownership", (t) => {
-	assert.equal(authorize(t, ["app/feature.ts"], {}).status, 0);
-});
-
 test("append-only guard permits ordinary commits and rejects amend", () => {
 	const script = "template/core/files/scripts/guard-append-only.sh";
 	assert.equal(
@@ -112,12 +46,12 @@ test("append-only guard permits ordinary commits and rejects amend", () => {
 	);
 });
 
-test("trusted workflows isolate guard, quality, and AI review", () => {
-	const guard = readFileSync(
-		join(root, ".github", "workflows", "guard.yml"),
+test("workflow triggers use least privilege", () => {
+	const policy = readFileSync(
+		join(root, ".github", "workflows", "pull-request.yml"),
 		"utf8",
 	);
-	const emittedGuard = readFileSync(
+	const emittedPolicy = readFileSync(
 		join(
 			root,
 			"template",
@@ -125,7 +59,7 @@ test("trusted workflows isolate guard, quality, and AI review", () => {
 			"files",
 			".github",
 			"workflows",
-			"guard.yml",
+			"pull-request.yml",
 		),
 		"utf8",
 	);
@@ -137,11 +71,13 @@ test("trusted workflows isolate guard, quality, and AI review", () => {
 		join(root, ".github", "workflows", "ai-review.yml"),
 		"utf8",
 	);
-	for (const workflow of [guard, emittedGuard]) {
-		assert.match(workflow, /pull_request_target:/);
-		assert.match(workflow, /git merge-base "\$BASE_SHA" "\$HEAD_SHA"/);
-		assert.match(workflow, /git diff --name-only -z --no-renames/);
-		assert.doesNotMatch(workflow, /run: (?:node|bash) .*HEAD_SHA/);
+	for (const workflow of [policy, emittedPolicy]) {
+		assert.match(workflow, /\n\s{2}pull_request:\n/);
+		assert.match(workflow, /github\.event\.pull_request\.base\.ref/);
+		assert.doesNotMatch(
+			workflow,
+			/pull_request_target:|actions\/checkout|secrets\.|INTEGRATION_OWNER|authorize-changes/,
+		);
 	}
 	assert.match(quality, /\n\s{2}pull_request:\n/);
 	assert.doesNotMatch(quality, /secrets\./);

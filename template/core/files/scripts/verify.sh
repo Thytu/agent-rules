@@ -46,7 +46,7 @@ check_workflows() {
 }
 
 if [ "$mode" = source ]; then
-	for path in AGENTS.md CLAUDE.md SCOPE.md VERIFICATION.md README.md init.sh package.json pnpm-lock.yaml .agents/skills docs/rules template/core/files/scripts/verify.sh template/rust/files template/rust/agent-map.rows template/typescript/files template/typescript/agent-map.rows test/generator tooling/pr-review .github/workflows/ci.yml .github/workflows/guard.yml .github/workflows/ai-review.yml; do require "$path"; done
+	for path in AGENTS.md CLAUDE.md SCOPE.md VERIFICATION.md README.md init.sh package.json pnpm-lock.yaml .agents/skills docs/rules template/core/files/scripts/verify.sh template/rust/files template/rust/agent-map.rows template/typescript/files template/typescript/agent-map.rows test/generator tooling/pr-review .github/workflows/ci.yml .github/workflows/pull-request.yml .github/workflows/ai-review.yml; do require "$path"; done
 	[ ! -e "$root/scripts/check-map.sh" ] || fail "legacy check-map.sh must be removed"
 	for path in .github/dependabot.yml template/core/dependabot.update.yml template/rust/dependabot.update.yml template/typescript/dependabot.update.yml; do [ ! -e "$root/$path" ] || fail "scheduled Dependabot configuration must be absent: $path"; done
 	[ ! -e "$root/docs/profiles" ] || fail "language profile documents must be absent"
@@ -55,7 +55,7 @@ if [ "$mode" = source ]; then
 	exit 0
 fi
 
-for path in AGENTS.md CLAUDE.md README.md SCOPE.md VERIFICATION.md docs/rules .githooks .github/workflows/ci.yml .github/workflows/guard.yml .agent-rules/guarded-paths/core.txt scripts/setup.sh scripts/setup-github.sh scripts/verify.sh scripts/authorize-changes.sh scripts/guard-shared.sh scripts/guard-append-only.sh scripts/commit-msg.sh; do require "$path"; done
+for path in AGENTS.md CLAUDE.md README.md SCOPE.md VERIFICATION.md docs/rules .githooks .github/workflows/ci.yml .github/workflows/pull-request.yml scripts/setup.sh scripts/setup-github.sh scripts/verify.sh scripts/guard-append-only.sh scripts/commit-msg.sh; do require "$path"; done
 for forbidden in init.sh template tooling/pr-review test/generator scripts/setup-source.sh .agents .claude docs/profiles; do [ ! -e "$root/$forbidden" ] || fail "generator path survived: $forbidden"; done
 check_map "$root/AGENTS.md"
 check_workflows
@@ -71,7 +71,7 @@ if [ -f "$root/package.json" ] && [ -f "$root/tsconfig.json" ]; then
 	require scripts/verify-typescript.sh
 else
 	[ ! -f "$root/tsconfig.json" ] || fail "tsconfig.json exists without package.json"
-	for path in scripts/setup-typescript.sh scripts/verify-typescript.sh .agent-rules/guarded-paths/typescript.txt; do [ ! -e "$root/$path" ] || fail "unselected TypeScript policy exists: $path"; done
+	for path in scripts/setup-typescript.sh scripts/verify-typescript.sh; do [ ! -e "$root/$path" ] || fail "unselected TypeScript policy exists: $path"; done
 fi
 
 [ "$mode" = structure ] && exit 0

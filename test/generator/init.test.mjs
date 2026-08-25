@@ -142,13 +142,7 @@ set -euo pipefail
 printf '%s\n' "$*" >> "$GH_LOG"
 case "$*" in
 	"repo view --json nameWithOwner --jq .nameWithOwner") printf 'org/repo\n' ;;
-	"api user --jq .login") printf 'owner\n' ;;
-	"variable list --repo org/repo --json name --jq .[].name")
-		if [ -e "$GH_STATE/integration-owner" ]; then printf 'INTEGRATION_OWNER\n'; fi
-		;;
-	"variable set INTEGRATION_OWNER --repo org/repo --body owner") touch "$GH_STATE/integration-owner" ;;
 	"api -X PUT repos/org/repo/vulnerability-alerts") printf 'enabled\n' > "$GH_STATE/vulnerability-alerts" ;;
-	"api -X DELETE repos/org/repo/automated-security-fixes") printf 'disabled\n' > "$GH_STATE/automated-security-fixes" ;;
 	"api repos/org/repo/rulesets") printf '[]\n' ;;
 esac
 case " $* " in *" --input - "*) cat >/dev/null ;; esac
@@ -166,20 +160,15 @@ case " $* " in *" --input - "*) cat >/dev/null ;; esac
 		},
 	};
 	const initial = execFileSync("bash", ["scripts/setup-github.sh"], options);
-	assert.equal(readFileSync(alerts, "utf8"), "enabled\n");
-	assert.equal(readFileSync(securityFixes, "utf8"), "disabled\n");
-	writeFileSync(securityFixes, "enabled\n");
 	const rerun = execFileSync("bash", ["scripts/setup-github.sh"], options);
+	assert.equal(readFileSync(alerts, "utf8"), "enabled\n");
 	assert.equal(readFileSync(securityFixes, "utf8"), "enabled\n");
-	assert.equal(
-		(
-			readFileSync(log, "utf8").match(
-				/^api -X DELETE repos\/org\/repo\/automated-security-fixes$/gm,
-			) ?? []
-		).length,
-		1,
+	const calls = readFileSync(log, "utf8");
+	assert.doesNotMatch(
+		calls,
+		/INTEGRATION_OWNER|automated-security-fixes|api user|variable (?:list|set)/,
 	);
-	assert.match(initial, /automated security pull requests disabled/);
+	assert.match(initial, /security pull-request preference preserved/);
 	assert.match(rerun, /security pull-request preference preserved/);
 }
 
