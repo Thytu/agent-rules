@@ -22,11 +22,6 @@ Build production software a real user runs. Do not cut requested behavior withou
 | Rust output | changing Rust materialization or enforcement | `template/rust/files/Cargo.toml`, `template/rust/files/scripts/verify-rust.sh` |
 | TypeScript output | changing TypeScript materialization or enforcement | `template/typescript/files/package.json`, `template/typescript/files/scripts/verify-typescript.sh` |
 | Repository workflow | before committing, synchronizing, or preparing a pull request | `README.md` |
-| Autopilot | orchestrating a complete task in an isolated worktree | `.agents/skills/autopilot/SKILL.md` |
-| Create pull requests | preparing a pull request | `.agents/skills/create-pr/SKILL.md` |
-| Root-cause analysis | investigating a failure | `.agents/skills/root-cause/SKILL.md` |
-| Judge loops | challenging a plan or diff | `.agents/skills/judge-loop/SKILL.md` |
-| Headless lanes | delegating autonomous implementation | `.agents/skills/running-headless-lanes/SKILL.md` |
 | Rule-owner review | changing reviewer behavior | `tooling/pr-review/README.md` |
 
 ## Commands
