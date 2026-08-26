@@ -363,7 +363,6 @@ for (const mode of [
 			cwd: root,
 			env: isolatedEnvironment,
 		});
-
 		if (mode === "python") {
 			mkdirSync(join(root, "src"), { recursive: true });
 			mkdirSync(join(root, "tests"), { recursive: true });
