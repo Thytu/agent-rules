@@ -9,9 +9,13 @@ Create a repository from this GitHub template, then run exactly one command befo
 The source repository also carries auto-discovered workflows under `.agents/skills/`; they remain source-only and are removed by materialization.
 
 ```bash
+./init.sh python
 ./init.sh rust
 ./init.sh typescript
+./init.sh python,rust
+./init.sh python,typescript
 ./init.sh rust,typescript
+./init.sh python,rust,typescript
 ```
 
 Initialization copies a language-neutral core plus only the selected language trees, validates the complete output in a temporary directory, replaces the template payload with rollback protection, installs selected tooling, and removes the generator.

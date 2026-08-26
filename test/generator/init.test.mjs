@@ -94,6 +94,14 @@ function paths(root) {
 				rel === "node_modules" ||
 				rel.startsWith("node_modules/") ||
 				rel === ".agent-rules/tools" ||
+				rel === ".venv" ||
+				rel.startsWith(".venv/") ||
+				rel === ".pytest_cache" ||
+				rel.startsWith(".pytest_cache/") ||
+				rel === ".ruff_cache" ||
+				rel.startsWith(".ruff_cache/") ||
+				rel.includes("/__pycache__/") ||
+				rel.endsWith("/__pycache__") ||
 				rel.startsWith(".agent-rules/tools/") ||
 				rel === "target" ||
 				rel.startsWith("target/")
@@ -172,7 +180,15 @@ case " $* " in *" --input - "*) cat >/dev/null ;; esac
 	assert.match(rerun, /security pull-request preference preserved/);
 }
 
-for (const mode of ["rust", "typescript", "rust,typescript"]) {
+for (const mode of [
+	"python",
+	"rust",
+	"typescript",
+	"python,rust",
+	"python,typescript",
+	"rust,typescript",
+	"python,rust,typescript",
+]) {
 	test(`materializes and exercises ${mode}`, { timeout: 20 * 60_000 }, (t) => {
 		const { root, temp } = repository(t);
 		runInit(root, mode, {
@@ -191,6 +207,12 @@ for (const mode of ["rust", "typescript", "rust,typescript"]) {
 		assert.equal(
 			Boolean(mode.includes("typescript")),
 			lstatSync(join(root, "package.json"), {
+				throwIfNoEntry: false,
+			})?.isFile() ?? false,
+		);
+		assert.equal(
+			Boolean(mode.includes("python")),
+			lstatSync(join(root, "pyproject.toml"), {
 				throwIfNoEntry: false,
 			})?.isFile() ?? false,
 		);
@@ -224,6 +246,10 @@ for (const mode of ["rust", "typescript", "rust,typescript"]) {
 			agentMap.includes("TypeScript implementation"),
 			mode.includes("typescript"),
 		);
+		assert.equal(
+			agentMap.includes("Python implementation"),
+			mode.includes("python"),
+		);
 		assert.doesNotMatch(agentMap, /docs\/profiles|LANGUAGE_ROWS/);
 		const pullRequestTemplate = readFileSync(
 			join(root, ".github", "PULL_REQUEST_TEMPLATE.md"),
@@ -243,7 +269,7 @@ for (const mode of ["rust", "typescript", "rust,typescript"]) {
 			"test",
 			"generator",
 			"golden",
-			`${mode.replace(",", "-")}.paths`,
+			`${mode.replaceAll(",", "-")}.paths`,
 		);
 		if (isolatedEnvironment.UPDATE_GOLDENS === "1")
 			writeFileSync(golden, actual);
@@ -269,6 +295,69 @@ for (const mode of ["rust", "typescript", "rust,typescript"]) {
 			env: isolatedEnvironment,
 			stdio: isolatedEnvironment.DEBUG_INIT === "1" ? "inherit" : undefined,
 		});
+		if (mode === "python") {
+			mkdirSync(join(root, "src"), { recursive: true });
+			mkdirSync(join(root, "tests"), { recursive: true });
+			writeFileSync(
+				join(root, "src", "product.py"),
+				"from dataclasses import dataclass\n\n\n@dataclass(frozen=True, slots=True)\nclass Product:\n    value: int\n\n\ndef doubled(product: Product) -> int:\n    return product.value * 2\n",
+			);
+			writeFileSync(
+				join(root, "tests", "test_product.py"),
+				"from product import Product, doubled\n\n\ndef test_doubled() -> None:\n    assert doubled(Product(value=21)) == 42\n",
+			);
+			execFileSync("bash", ["scripts/verify.sh"], {
+				cwd: root,
+				env: isolatedEnvironment,
+				stdio: isolatedEnvironment.DEBUG_INIT === "1" ? "inherit" : undefined,
+			});
+			const invalidPython = join(root, "src", "invalid.py");
+			for (const [invalid, message] of [
+				[
+					'def read_name(value: object) -> str:\n    return getattr(value, "name")\n',
+					/B009|TID251|bad-builtin/,
+				],
+				[
+					"from typing import Any\n\n\ndef preserve(value: Any) -> Any:\n    return value\n",
+					/TID251|ANN401/,
+				],
+				[
+					'def parse(value: str) -> str:\n    try:\n        return value\n    except Exception:\n        return ""\n',
+					/BLE001/,
+				],
+				[
+					"def today() -> str:\n    from datetime import date\n\n    return date.today().isoformat()\n",
+					/PLC0415/,
+				],
+				[
+					"from typing import cast\n\n\ndef preserve(value: object) -> str:\n    return cast(str, value)\n",
+					/TID251/,
+				],
+				["def report(value: str) -> None:\n    print(value)\n", /T201/],
+				[
+					"def pending() -> None:\n    # TODO: implement persistence\n    return None\n",
+					/FIX002/,
+				],
+				[
+					"def preserve(value: object) -> object:  # noqa\n    return value\n",
+					/PGH004|RUF100/,
+				],
+				[
+					"def classify(value: int) -> int:\n    if value == 0:\n        return 0\n    if value == 1:\n        return 1\n    if value == 2:\n        return 2\n    if value == 3:\n        return 3\n    if value == 4:\n        return 4\n    if value == 5:\n        return 5\n    if value == 6:\n        return 6\n    if value == 7:\n        return 7\n    if value == 8:\n        return 8\n    if value == 9:\n        return 9\n    return value\n",
+					/C901|PLR0911/,
+				],
+			]) {
+				writeFileSync(invalidPython, invalid);
+				const rejected = spawnSync("bash", ["scripts/verify-python.sh"], {
+					cwd: root,
+					encoding: "utf8",
+					env: isolatedEnvironment,
+				});
+				assert.notEqual(rejected.status, 0);
+				assert.match(`${rejected.stdout}${rejected.stderr}`, message);
+			}
+			rmSync(invalidPython);
+		}
 		if (mode === "rust,typescript") {
 			mkdirSync(join(root, "test", "product"), { recursive: true });
 			writeFileSync(
@@ -373,9 +462,9 @@ for (const remote of [
 const unsafeInputs = [
 	{
 		name: "invalid selection",
-		args: ["python"],
+		args: ["go"],
 		mutate() {},
-		expected: /expected rust, typescript, or rust,typescript/,
+		expected: /invalid language selection/,
 	},
 	{
 		name: "non-main branch",

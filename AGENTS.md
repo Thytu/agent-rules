@@ -19,6 +19,7 @@ Build production software a real user runs. Do not cut requested behavior withou
 | Testing | writing or changing tests | `docs/rules/testing.md` |
 | Comments | adding or changing comments | `docs/rules/comments.md` |
 | Dependency integrity | changing dependencies, tools, runtimes, or pins | `docs/rules/dependency-integrity.md` |
+| Python output | changing Python materialization or enforcement | `template/python/files/pyproject.toml`, `template/python/files/scripts/verify-python.sh` |
 | Rust output | changing Rust materialization or enforcement | `template/rust/files/Cargo.toml`, `template/rust/files/scripts/verify-rust.sh` |
 | TypeScript output | changing TypeScript materialization or enforcement | `template/typescript/files/package.json`, `template/typescript/files/scripts/verify-typescript.sh` |
 | Repository workflow | before committing, synchronizing, or preparing a pull request | `README.md` |
@@ -30,6 +31,7 @@ Build production software a real user runs. Do not cut requested behavior withou
 |---|---|
 | Set up source checkout | `bash scripts/setup-source.sh` |
 | Full source gate | `pnpm verify` |
+| Initialize Python repository | `./init.sh python` |
 | Initialize Rust repository | `./init.sh rust` |
 | Initialize TypeScript repository | `./init.sh typescript` |
 | Initialize mixed repository | `./init.sh rust,typescript` |

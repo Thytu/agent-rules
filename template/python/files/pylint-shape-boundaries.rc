@@ -1,0 +1,16 @@
+[MAIN]
+ignore=.agent-rules,.venv,build,dist,node_modules,target
+load-plugins=pylint.extensions.bad_builtin
+
+[MESSAGES CONTROL]
+disable=all
+enable=bad-builtin
+
+[bad_builtin]
+bad-functions=getattr,hasattr,isinstance,setattr
+
+[REPORTS]
+score=no
+msg-template={path}:{line}:{column}: {msg_id} {symbol}: {msg}
+  Shape-boundary failure, not a syntax ban.
+  Parse the untrusted value once into a named model, protocol, or discriminated union; pass the typed value inward.

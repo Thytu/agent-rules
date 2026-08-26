@@ -50,6 +50,7 @@ install_actionlint
 [ "$mode" = structure ] && exit 0
 
 git -C "$root" config core.hooksPath .githooks
+[ -x "$root/scripts/setup-python.sh" ] && "$root/scripts/setup-python.sh"
 [ -x "$root/scripts/setup-rust.sh" ] && "$root/scripts/setup-rust.sh"
 [ -x "$root/scripts/setup-typescript.sh" ] && "$root/scripts/setup-typescript.sh"
 

@@ -17,6 +17,7 @@ export default [
 			"coverage/**",
 			"node_modules/**",
 			"target/**",
+			".venv/**",
 			".agent-rules/**",
 		],
 	},

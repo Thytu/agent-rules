@@ -2,8 +2,8 @@
 set -euo pipefail
 
 selection="${1:-}"
-[ "$#" -eq 1 ] || { echo "usage: ./init.sh rust|typescript|rust,typescript" >&2; exit 2; }
-case "$selection" in rust|typescript|rust,typescript) ;; *) echo "init: expected rust, typescript, or rust,typescript" >&2; exit 2 ;; esac
+[ "$#" -eq 1 ] || { echo "usage: ./init.sh python|rust|typescript|python,rust|python,typescript|rust,typescript|python,rust,typescript" >&2; exit 2; }
+case "$selection" in python|rust|typescript|python,rust|python,typescript|rust,typescript|python,rust,typescript) ;; *) echo "init: invalid language selection" >&2; exit 2 ;; esac
 
 while IFS='=' read -r name _value; do case "$name" in GIT_*) unset "$name" ;; esac; done < <(env)
 export GIT_CONFIG_NOSYSTEM=1
@@ -50,6 +50,11 @@ cp -a "$root/docs/rules/." "$out/docs/rules/"
 gitignore_fragments=("$root/template/core/gitignore.entries")
 map_fragments=()
 
+if [[ ",$selection," == *,python,* ]]; then
+	copy_tree "$root/template/python/files" "$out"
+	gitignore_fragments+=("$root/template/python/gitignore.entries")
+	map_fragments+=("$root/template/python/agent-map.rows")
+fi
 if [[ ",$selection," == *,rust,* ]]; then
 	copy_tree "$root/template/rust/files" "$out"
 	gitignore_fragments+=("$root/template/rust/gitignore.entries")
@@ -99,6 +104,7 @@ diff -qr -x .git "$out" "$root" >/dev/null
 
 "$root/scripts/setup.sh"
 "$root/scripts/verify.sh" --structure-only
+[ -x "$root/scripts/verify-python.sh" ] && "$root/scripts/verify-python.sh"
 [ -x "$root/scripts/verify-rust.sh" ] && "$root/scripts/verify-rust.sh"
 [ -x "$root/scripts/verify-typescript.sh" ] && "$root/scripts/verify-typescript.sh"
 trap - ERR INT TERM
