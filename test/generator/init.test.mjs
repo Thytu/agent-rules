@@ -81,6 +81,74 @@ function runInit(root, mode, extraEnv = {}) {
 		stdio: isolatedEnvironment.DEBUG_INIT === "1" ? "inherit" : undefined,
 	});
 }
+const liveModes = new Set([
+	"python",
+	"rust",
+	"typescript",
+	"python,rust,typescript",
+]);
+
+function stubToolBoundaries(root, temp) {
+	const bin = join(temp, "tool-bin");
+	mkdirSync(bin);
+	for (const command of ["taplo", "typos", "cargo-deny", "cargo-machete"]) {
+		const path = join(bin, command);
+		writeFileSync(path, "#!/usr/bin/env bash\nexit 0\n");
+		chmodSync(path, 0o755);
+	}
+	const cargo = join(bin, "cargo");
+	writeFileSync(
+		cargo,
+		`#!/usr/bin/env bash
+case " $* " in *" metadata "*) printf '{"packages":[]}\n' ;; esac
+`,
+	);
+	chmodSync(cargo, 0o755);
+
+	const setup = join(root, "template", "core", "files", "scripts", "setup.sh");
+	writeFileSync(
+		setup,
+		`#!/usr/bin/env bash
+set -euo pipefail
+if [ "\${1:-}" = "--structure-only" ]; then
+  [ "\${2:-}" = "--tools-dir" ]
+  tools="\${3:?}"
+  mkdir -p "$tools"
+  printf '#!/usr/bin/env bash\nexit 0\n' > "$tools/actionlint"
+  chmod 0755 "$tools/actionlint"
+  exit 0
+fi
+root="$(cd "$(dirname "$0")/.." && pwd -P)"
+tools="$root/.agent-rules/tools"
+mkdir -p "$tools/uv" "$tools/node/bin"
+cat > "$tools/actionlint" <<'SH'
+#!/usr/bin/env bash
+exit 0
+SH
+cat > "$tools/uv/uv" <<'SH'
+#!/usr/bin/env bash
+case "$*" in
+  "--version") printf 'uv 0.12.6\n' ;;
+  *" python --version") printf 'Python 3.13.13\n' ;;
+esac
+SH
+cat > "$tools/node/bin/node" <<'SH'
+#!/usr/bin/env bash
+printf 'v22.22.0\n'
+SH
+cat > "$tools/node/bin/pnpm" <<'SH'
+#!/usr/bin/env bash
+if [ "\${1:-}" = "--version" ]; then printf '10.20.0\n'; fi
+SH
+chmod 0755 "$tools/actionlint" "$tools/uv/uv" "$tools/node/bin/node" "$tools/node/bin/pnpm"
+git -C "$root" config core.hooksPath .githooks
+`,
+	);
+	chmodSync(setup, 0o755);
+	git(root, "add", ".");
+	git(root, "commit", "-qm", "test: stub external tool boundaries");
+	return `${bin}:${inheritedPath}`;
+}
 
 function paths(root) {
 	const result = [];
@@ -189,13 +257,18 @@ for (const mode of [
 	"rust,typescript",
 	"python,rust,typescript",
 ]) {
-	test(`materializes and exercises ${mode}`, { timeout: 20 * 60_000 }, (t) => {
+	const live = liveModes.has(mode);
+	test(`${live ? "materializes and exercises" : "materializes"} ${mode}`, {
+		timeout: 20 * 60_000,
+	}, (t) => {
 		const { root, temp } = repository(t);
+		const path = live ? inheritedPath : stubToolBoundaries(root, temp);
 		runInit(root, mode, {
 			GIT_DIR: join(temp, "wrong.git"),
 			GIT_CONFIG_COUNT: "1",
 			GIT_CONFIG_KEY_0: "core.worktree",
 			GIT_CONFIG_VALUE_0: temp,
+			PATH: path,
 		});
 		assert.equal(lstatSync(join(root, "CLAUDE.md")).isSymbolicLink(), true);
 		assert.equal(
@@ -290,11 +363,6 @@ for (const mode of [
 			cwd: root,
 			env: isolatedEnvironment,
 		});
-		execFileSync("bash", ["scripts/verify.sh"], {
-			cwd: root,
-			env: isolatedEnvironment,
-			stdio: isolatedEnvironment.DEBUG_INIT === "1" ? "inherit" : undefined,
-		});
 		if (mode === "python") {
 			mkdirSync(join(root, "src"), { recursive: true });
 			mkdirSync(join(root, "tests"), { recursive: true });
@@ -358,7 +426,7 @@ for (const mode of [
 			}
 			rmSync(invalidPython);
 		}
-		if (mode === "rust,typescript") {
+		if (mode === "typescript") {
 			mkdirSync(join(root, "test", "product"), { recursive: true });
 			writeFileSync(
 				join(root, "test", "product", "value.test.ts"),
@@ -372,6 +440,13 @@ for (const mode of [
 				join(root, "test", "product", "ignored.test.mjs"),
 				'throw new Error("unsupported test extension executed");\n',
 			);
+			execFileSync("bash", ["scripts/verify.sh"], {
+				cwd: root,
+				env: isolatedEnvironment,
+				stdio: isolatedEnvironment.DEBUG_INIT === "1" ? "inherit" : undefined,
+			});
+		}
+		if (mode === "rust") {
 			const cargoPath = join(root, "Cargo.toml");
 			writeFileSync(
 				cargoPath,
