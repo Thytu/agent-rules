@@ -2,4 +2,6 @@
 set -euo pipefail
 root="$(git rev-parse --show-toplevel)"
 cd "$root"
-pnpm verify
+bash "$root/template/core/files/scripts/verify.sh" --source
+pnpm format:check
+pnpm lint
