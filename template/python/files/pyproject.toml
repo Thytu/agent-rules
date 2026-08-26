@@ -1,0 +1,105 @@
+[project]
+name = "generated-product"
+version = "0.0.0"
+requires-python = "==3.13.13"
+dependencies = []
+
+[dependency-groups]
+dev = [
+  "deptry==0.25.1",
+  "pip-audit==2.10.1",
+  "pylint==4.0.7",
+  "pyright[nodejs]==1.1.411",
+  "pytest==9.1.1",
+  "pytest-asyncio==1.4.0",
+  "ruff==0.16.4",
+]
+
+[tool.uv]
+package = false
+
+[tool.pyright]
+include = ["."]
+exclude = [".agent-rules", ".venv", "build", "dist", "node_modules", "target"]
+extraPaths = ["src"]
+pythonVersion = "3.13"
+typeCheckingMode = "strict"
+venv = ".venv"
+venvPath = "."
+reportCallInDefaultInitializer = "error"
+reportDeprecated = "error"
+reportImportCycles = "error"
+reportMatchNotExhaustive = "error"
+reportUnnecessaryTypeIgnoreComment = "error"
+reportUnreachable = "error"
+reportUnusedCallResult = "error"
+
+[tool.pytest.ini_options]
+addopts = ["--strict-config", "--strict-markers"]
+asyncio_mode = "strict"
+pythonpath = ["src"]
+testpaths = ["test", "tests"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py313"
+
+[tool.ruff.format]
+docstring-code-format = true
+
+[tool.ruff.lint]
+select = [
+  "A",
+  "ANN",
+  "ASYNC",
+  "B",
+  "BLE",
+  "C4",
+  "C90",
+  "DTZ",
+  "E",
+  "ERA",
+  "F",
+  "FBT",
+  "FIX",
+  "I",
+  "LOG",
+  "N",
+  "PERF",
+  "PGH",
+  "PIE",
+  "PLC0415",
+  "PLR0911",
+  "PLR0912",
+  "PLR0915",
+  "RET",
+  "RSE",
+  "RUF",
+  "S",
+  "SIM",
+  "T20",
+  "TID251",
+  "UP",
+]
+
+[tool.ruff.lint.flake8-tidy-imports.banned-api]
+"builtins.getattr".msg = "Parse external values into a named model at the boundary; pass the typed shape inward."
+"builtins.hasattr".msg = "Parse external values into a named model at the boundary; pass the typed shape inward."
+"builtins.isinstance".msg = "Model variants as a typed union instead of probing shapes in business logic."
+"builtins.setattr".msg = "Model mutation explicitly instead of changing an unknown shape dynamically."
+"typing.Any".msg = "Model the value precisely; untrusted shapes must be parsed at their boundary."
+"typing.cast".msg = "Resolve type uncertainty at its boundary instead of hiding it with cast."
+"typing_extensions.Any".msg = "Model the value precisely; untrusted shapes must be parsed at their boundary."
+"typing_extensions.cast".msg = "Resolve type uncertainty at its boundary instead of hiding it with cast."
+
+[tool.ruff.lint.mccabe]
+max-complexity = 10
+
+[tool.ruff.lint.per-file-ignores]
+"test/**/*.py" = ["S101"]
+"tests/**/*.py" = ["S101"]
+
+[tool.ruff.lint.pylint]
+max-branches = 12
+max-returns = 6
+max-statements = 50

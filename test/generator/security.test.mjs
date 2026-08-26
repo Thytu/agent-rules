@@ -46,6 +46,28 @@ test("append-only guard permits ordinary commits and rejects amend", () => {
 	);
 });
 
+test("pre-commit stays fast while pre-push runs the full gate", () => {
+	const sourceCommit = readFileSync(
+		join(root, ".githooks", "pre-commit"),
+		"utf8",
+	);
+	const sourcePush = readFileSync(join(root, ".githooks", "pre-push"), "utf8");
+	const generatedHooks = join(root, "template", "core", "files", ".githooks");
+	const generatedCommit = readFileSync(
+		join(generatedHooks, "pre-commit"),
+		"utf8",
+	);
+	const generatedPush = readFileSync(join(generatedHooks, "pre-push"), "utf8");
+
+	assert.match(sourceCommit, /verify\.sh" --source/);
+	assert.match(sourceCommit, /pnpm format:check/);
+	assert.match(sourceCommit, /pnpm lint/);
+	assert.doesNotMatch(sourceCommit, /pnpm verify/);
+	assert.match(generatedCommit, /verify\.sh" --structure-only/);
+	assert.match(sourcePush, /pnpm verify/);
+	assert.match(generatedPush, /verify\.sh"$/m);
+});
+
 test("workflow triggers use least privilege", () => {
 	const policy = readFileSync(
 		join(root, ".github", "workflows", "pull-request.yml"),
