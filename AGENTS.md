@@ -6,6 +6,8 @@ This is the root agent-facing map. Nested `AGENTS.md` files are child maps, link
 
 Build production software a real user runs. Do not cut requested behavior without explicit approval. Unhappy paths, real scale, and empty/error/permission states are in scope.
 
+Keep each Markdown prose paragraph on one physical line; do not manually wrap prose to a target width.
+
 ## The map
 
 | Topic | Read when | Where |
