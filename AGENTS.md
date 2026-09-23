@@ -1,6 +1,8 @@
 # Agent map
 
-This is the only agent-facing index. Vendor entry points are pointer shims, never a second rulebook.
+This is the root agent-facing map. Nested `AGENTS.md` files are child maps,
+linked from their parent. Keep all guidance rooted in this tree. Vendor entry
+points are pointer shims, never a second rulebook.
 
 ## The lens
 
@@ -35,4 +37,3 @@ Build production software a real user runs. Do not cut requested behavior withou
 | Initialize Rust repository | `./init.sh rust` |
 | Initialize TypeScript repository | `./init.sh typescript` |
 | Initialize mixed repository | `./init.sh rust,typescript` |
-

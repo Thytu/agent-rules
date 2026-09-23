@@ -13,17 +13,36 @@ require() { [ -e "$root/$1" ] || fail "missing required path $1"; }
 check_map() {
 	local map="$1" budget path rule
 	budget="$(wc -l < "$map" | tr -d ' ')"
-	[ "$budget" -le 60 ] || fail "AGENTS.md exceeds 60 lines"
-	[ "$(readlink "$root/CLAUDE.md" || true)" = AGENTS.md ] || fail "CLAUDE.md must be a symlink to AGENTS.md"
+	[ "$budget" -le 60 ] || fail "$map exceeds 60 lines"
+	if [ "$map" = "$root/AGENTS.md" ]; then
+		[ "$(readlink "$root/CLAUDE.md" || true)" = AGENTS.md ] || fail "CLAUDE.md must be a symlink to AGENTS.md"
+	fi
 	while IFS= read -r path; do
-		[ -e "$root/$path" ] || fail "AGENTS.md maps missing path $path"
+		[ -e "$root/$path" ] || fail "$map maps missing path $path"
 	done < <(grep -oE '`(docs/[A-Za-z0-9._/-]+|[A-Z][A-Z-]+\.md|scripts/[A-Za-z0-9._/-]+|tooling/[A-Za-z0-9._/-]+|template/[A-Za-z0-9._/-]+|\.agents/[A-Za-z0-9._/-]+|Cargo\.toml|rust-toolchain\.toml|clippy\.toml|package\.json|tsconfig\.json|eslint\.config\.mjs|pyproject\.toml|pylint-shape-boundaries\.rc)`' "$map" | tr -d '\`' | sort -u)
-	for rule in "$root"/docs/rules/*.md; do
-		path="docs/rules/$(basename "$rule")"
-		grep -Fq "\`$path\`" "$map" || fail "AGENTS.md does not map rule owner $path"
-	done
+	if [ "$map" = "$root/AGENTS.md" ]; then
+		for rule in "$root"/docs/rules/*.md; do
+			path="docs/rules/$(basename "$rule")"
+			grep -Fq "\`$path\`" "$map" || fail "AGENTS.md does not map rule owner $path"
+		done
+	fi
 	[ "$mode" = source ] || ! grep -Fq '<!-- LANGUAGE_ROWS -->' "$map" || fail "unresolved language map rows"
-	while IFS= read -r path; do fail "nested agent entry ${path#$root/}"; done < <(find "$root" -type f \( -name AGENTS.md -o -name CLAUDE.md \) ! -path "$root/AGENTS.md" ! -path "$root/CLAUDE.md" ! -path "$root/template/*" ! -path '*/node_modules/*' ! -path '*/.git/*')
+}
+
+check_nested_maps() {
+	local map map_rel parent_dir parent_map
+	while IFS= read -r map; do
+		map_rel="${map#$root/}"
+		parent_dir="$(dirname "$(dirname "$map")")"
+		parent_map="$root/AGENTS.md"
+		while [ "$parent_dir" != "$root" ]; do
+			if [ -f "$parent_dir/AGENTS.md" ]; then parent_map="$parent_dir/AGENTS.md"; break; fi
+			parent_dir="$(dirname "$parent_dir")"
+		done
+		grep -Fq "\`$map_rel\`" "$parent_map" || fail "$parent_map does not route to nested map $map_rel"
+		check_map "$map"
+	done < <(find "$root" -type f -name AGENTS.md ! -path "$root/AGENTS.md" ! -path "$root/template/*" ! -path '*/node_modules/*' ! -path '*/.git/*')
+	while IFS= read -r map; do fail "nested CLAUDE.md entry ${map#$root/}"; done < <(find "$root" -type f -name CLAUDE.md ! -path "$root/CLAUDE.md" ! -path "$root/template/*" ! -path '*/node_modules/*' ! -path '*/.git/*')
 }
 
 check_workflows() {
@@ -41,6 +60,7 @@ if [ "$mode" = source ]; then
 	for path in .github/dependabot.yml template/core/dependabot.update.yml template/python/dependabot.update.yml template/rust/dependabot.update.yml template/typescript/dependabot.update.yml; do [ ! -e "$root/$path" ] || fail "scheduled Dependabot configuration must be absent: $path"; done
 	[ ! -e "$root/docs/profiles" ] || fail "language profile documents must be absent"
 	check_map "$root/AGENTS.md"
+	check_nested_maps
 	check_workflows
 	exit 0
 fi
@@ -48,6 +68,7 @@ fi
 for path in AGENTS.md CLAUDE.md README.md docs/rules .githooks .github/workflows/ci.yml .github/workflows/pull-request.yml scripts/setup.sh scripts/setup-github.sh scripts/verify.sh scripts/guard-append-only.sh scripts/commit-msg.sh; do require "$path"; done
 for forbidden in init.sh template tooling/pr-review test/generator scripts/setup-source.sh .agents .claude docs/profiles; do [ ! -e "$root/$forbidden" ] || fail "generator path survived: $forbidden"; done
 check_map "$root/AGENTS.md"
+check_nested_maps
 check_workflows
 [ -x "$root/.githooks/pre-commit" ] || fail "pre-commit hook is not executable"
 [ -x "$root/.githooks/pre-push" ] || fail "pre-push hook is not executable"
