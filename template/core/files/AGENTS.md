@@ -1,6 +1,6 @@
 # Agent map
 
-This file is the only agent-facing index. Vendor filenames are pointer shims, never a second rulebook.
+This is the root agent-facing map. Nested `AGENTS.md` files are child maps, linked from their parent. Keep all guidance rooted in this tree. Vendor filenames are pointer shims, never a second rulebook.
 
 ## The lens
 
@@ -29,4 +29,3 @@ Build production software a real user runs. Do not cut requested behavior withou
 | Infrastructure gate | `bash scripts/verify.sh --structure-only` |
 | Full gate | `bash scripts/verify.sh` |
 | Apply GitHub settings | `bash scripts/setup-github.sh` |
-
