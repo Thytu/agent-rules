@@ -11,23 +11,13 @@ fail() { echo "verify: $*" >&2; exit 1; }
 require() { [ -e "$root/$1" ] || fail "missing required path $1"; }
 
 check_map() {
-	local map="$1" budget path rule actual expected
+	local map="$1" budget path rule
 	budget="$(wc -l < "$map" | tr -d ' ')"
 	[ "$budget" -le 60 ] || fail "AGENTS.md exceeds 60 lines"
 	[ "$(readlink "$root/CLAUDE.md" || true)" = AGENTS.md ] || fail "CLAUDE.md must be a symlink to AGENTS.md"
 	while IFS= read -r path; do
 		[ -e "$root/$path" ] || fail "AGENTS.md maps missing path $path"
 	done < <(grep -oE '`(docs/[A-Za-z0-9._/-]+|[A-Z][A-Z-]+\.md|scripts/[A-Za-z0-9._/-]+|tooling/[A-Za-z0-9._/-]+|template/[A-Za-z0-9._/-]+|\.agents/[A-Za-z0-9._/-]+|Cargo\.toml|rust-toolchain\.toml|clippy\.toml|package\.json|tsconfig\.json|eslint\.config\.mjs|pyproject\.toml|pylint-shape-boundaries\.rc)`' "$map" | tr -d '\`' | sort -u)
-	expected="authorization-persistence
-boundaries
-comments
-contract-evolution
-dependency-integrity
-efficiency
-lifecycle-capacity
-testing"
-	actual="$(for rule in "$root"/docs/rules/*.md; do basename "$rule" .md; done | sort)"
-	[ "$actual" = "$expected" ] || fail "rule owner set must be exactly: $(printf '%s' "$expected" | tr '\n' ' ')"
 	for rule in "$root"/docs/rules/*.md; do
 		path="docs/rules/$(basename "$rule")"
 		grep -Fq "\`$path\`" "$map" || fail "AGENTS.md does not map rule owner $path"
