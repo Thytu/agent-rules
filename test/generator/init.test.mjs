@@ -445,6 +445,26 @@ for (const mode of [
 				env: isolatedEnvironment,
 				stdio: isolatedEnvironment.DEBUG_INIT === "1" ? "inherit" : undefined,
 			});
+			const objectPrototypeCheck = join(
+				root,
+				"app",
+				"object-prototype-check.ts",
+			);
+			writeFileSync(
+				objectPrototypeCheck,
+				'const tag = Object.prototype.toString.call("value");\n',
+			);
+			const rejected = spawnSync(
+				join(root, "node_modules", ".bin", "eslint"),
+				["app/object-prototype-check.ts"],
+				{ cwd: root, encoding: "utf8", env: isolatedEnvironment },
+			);
+			assert.notEqual(rejected.status, 0);
+			assert.match(
+				`${rejected.stdout}${rejected.stderr}`,
+				/no-restricted-properties/,
+			);
+			rmSync(objectPrototypeCheck);
 		}
 		if (mode === "rust") {
 			const cargoPath = join(root, "Cargo.toml");

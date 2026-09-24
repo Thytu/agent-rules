@@ -32,6 +32,15 @@ export default [
 		languageOptions: { globals: { ...globals.browser, ...globals.node } },
 		plugins: { house: housePlugin },
 		rules: {
+			"no-restricted-properties": [
+				"error",
+				{
+					object: "Object",
+					property: "prototype",
+					message:
+						"Do not use Object.prototype for type checks; parse untrusted values with a schema.",
+				},
+			],
 			"house/no-citation-comments": "error",
 			"house/no-compat-shims": "error",
 			"house/no-deferral-comments": "error",
