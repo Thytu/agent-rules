@@ -7,8 +7,8 @@ export default async function* report(source) {
 		if (type !== "test:pass" && type !== "test:fail") continue;
 		// A failed suite repeats its failed children; count each test once.
 		if (
-			data.details.type === "suite" ||
-			data.details.error?.failureType === "subtestsFailed"
+			data.details?.type === "suite" ||
+			data.details?.error?.failureType === "subtestsFailed"
 		)
 			continue;
 		const outcome = data.skip

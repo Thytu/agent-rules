@@ -40,7 +40,7 @@ install_tool() {
 		if [ ! -f "$cache" ]; then
 			echo "setup: downloading $name $version"
 			# A unique partial file keeps concurrent setups from sharing one download.
-			curl --connect-timeout 10 --max-time 300 -fsSL "$url" -o "$cache.partial.$$"
+			curl --connect-timeout 10 --max-time 300 -fsSL "$url" -o "$cache.partial.$$" || { rm -f "$cache.partial.$$"; echo "setup: could not download $name $version from $url" >&2; exit 1; }
 			mv "$cache.partial.$$" "$cache"
 		fi
 		if command -v sha256sum >/dev/null; then actual="$(sha256sum "$cache" | cut -d' ' -f1)"; else actual="$(shasum -a 256 "$cache" | cut -d' ' -f1)"; fi

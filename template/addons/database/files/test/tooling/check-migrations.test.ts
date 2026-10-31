@@ -127,6 +127,29 @@ test("editing or deleting a committed migration fails", (context) => {
 	assert.match(deleted.stderr, /an applied migration was deleted/);
 });
 
+test("a migration edited by a later branch commit fails the push check", (context) => {
+	const repo = repository(context);
+	repo.git("update-ref", "refs/remotes/origin/main", "HEAD");
+	repo.write(
+		"db/migrations/20260102000000_notes.sql",
+		"CREATE TABLE notes (id uuid);\n",
+	);
+	repo.git("add", ".");
+	repo.git("commit", "--quiet", "-m", "add notes");
+	repo.write(
+		"db/migrations/20260102000000_notes.sql",
+		"CREATE TABLE notes (id text);\n",
+	);
+	repo.git("add", ".");
+	repo.git("commit", "--quiet", "--no-verify", "-m", "edit notes");
+	const result = repo.check();
+	assert.equal(result.status, 1);
+	assert.match(
+		result.stderr,
+		/^[0-9a-f]{7} db\/migrations\/20260102000000_notes\.sql: an applied migration was modified$/m,
+	);
+});
+
 test("rewriting existing journal entries fails", (context) => {
 	const repo = repository(context);
 	repo.write(

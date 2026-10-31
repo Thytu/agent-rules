@@ -76,11 +76,21 @@ execFileSync("drizzle-kit", ["check"], { stdio: "inherit", timeout: 120_000 });
 
 const errors = [];
 if (revisionExists("HEAD")) errors.push(...rewrites("HEAD"));
-// Before a push, also compare the branch with the main branch it will merge
-// into, which catches a rewrite committed without the commit gate.
+// Before a push, check every commit on the branch against its parent, which
+// catches a rewrite committed without the commit gate, including an edit to a
+// migration the branch itself added earlier.
 if (revisionExists("origin/main") && revisionExists("HEAD")) {
 	const base = git("merge-base", "origin/main", "HEAD");
-	errors.push(...rewrites(base, "HEAD"));
+	const commits = git(
+		"rev-list",
+		"--reverse",
+		`${base}..HEAD`,
+		"--",
+		migrations,
+	);
+	for (const commit of commits.split("\n").filter(Boolean))
+		for (const error of rewrites(`${commit}^`, commit))
+			errors.push(`${commit.slice(0, 7)} ${error}`);
 } else {
 	console.log(
 		"check-migrations: skipped the comparison with origin/main, which this checkout does not have",
