@@ -1,0 +1,6 @@
+{
+	"defaultRoute": { "maxBytes": 700000, "maxCompressedBytes": 260000 },
+	"routes": {},
+	"defaultPackageMaxBytes": 125000,
+	"packages": { "next": 600000 }
+}

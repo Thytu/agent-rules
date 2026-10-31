@@ -1,1 +1,2 @@
 | TypeScript implementation | writing TypeScript or changing TypeScript dependencies | `package.json`, `tsconfig.json`, `eslint.config.mjs`, `scripts/verify-typescript.sh` |
+| Naming | naming JavaScript or TypeScript declarations, files, or properties | `docs/rules/naming.md` |

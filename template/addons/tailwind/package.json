@@ -1,0 +1,15 @@
+{
+	"devDependencies": {
+		"eslint-plugin-better-tailwindcss": "4.10.0",
+		"tailwindcss": "4.3.3"
+	},
+	"knip": {
+		"entry": [
+			"tooling/eslint-config/tailwind.mjs",
+			"src/styles/globals.css"
+		],
+		"project": [
+			"src/**/*.css"
+		]
+	}
+}

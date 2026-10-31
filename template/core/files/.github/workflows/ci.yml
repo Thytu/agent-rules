@@ -24,3 +24,16 @@ jobs:
         run: bash scripts/setup.sh
       - name: Verify repository and product contracts
         run: bash scripts/verify.sh
+
+  stability:
+    name: Test stability
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - name: Install pinned repository tooling
+        run: bash scripts/setup.sh
+      - name: Run every test suite three times and report changed outcomes
+        run: bash scripts/test-stability.sh

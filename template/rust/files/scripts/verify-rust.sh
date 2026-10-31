@@ -1,16 +1,26 @@
 #!/usr/bin/env bash
 set -euo pipefail
 root="$(cd "$(dirname "$0")/.." && pwd -P)"
+. "$root/scripts/verify-mode.sh" verify-rust "$@"
 cd "$root"
 fail() { echo "verify-rust: $*" >&2; exit 1; }
 for path in Cargo.toml Cargo.lock rust-toolchain.toml rustfmt.toml clippy.toml deny.toml .cargo/config.toml; do [ -f "$path" ] || fail "missing $path"; done
-for tool in taplo typos cargo-deny cargo-machete; do command -v "$tool" >/dev/null || fail "missing $tool; run scripts/setup-rust.sh"; done
+for tool in taplo typos cargo-deny cargo-llvm-cov cargo-machete; do command -v "$tool" >/dev/null || fail "missing $tool; run scripts/setup-rust.sh"; done
 
 metadata="$(mktemp)"
 trap 'rm -f "$metadata"' EXIT
 cargo +1.98.0 metadata --format-version 1 --no-deps --locked > "$metadata"
 
 toml=(Cargo.toml .cargo/config.toml clippy.toml deny.toml rust-toolchain.toml rustfmt.toml)
+if [ "$mode" = results ]; then
+	if grep -q '"packages":\[\]' "$metadata"; then : > "$results"; exit 0; fi
+	# libtest prints "test NAME ... OUTCOME"; the binary name keeps the same test
+	# path in two crates apart.
+	cargo +1.98.0 test --workspace --all-targets --all-features --locked --no-fail-fast 2>&1 | tee /dev/stderr |
+		awk '/^ *Running / { binary = $0; sub(/^.*\(/, "", binary); sub(/\).*$/, "", binary); count = split(binary, parts, "/"); binary = parts[count]; sub(/-[0-9a-f]+$/, "", binary) }
+			/^test .* \.\.\. (ok|FAILED|ignored)/ { outcome = $4; sub(/,$/, "", outcome); print tolower(outcome) "\t" binary "::" $2 }' > "$results"
+	exit 0
+fi
 if grep -q '"packages":\[\]' "$metadata"; then
 	taplo format --check "${toml[@]}"
 	taplo lint "${toml[@]}"
@@ -58,10 +68,18 @@ for manifest in "${manifests[@]}"; do
 	done < <(sed -n 's/^\[\([^]]*\)\][[:space:]]*$/\1/p' "$manifest")
 done
 
-cargo +1.98.0 deny check
+# A commit checks advisories only when it changes dependencies; the push and CI
+# gates check them on every change.
+if [ "$mode" = full ] || ! git diff --cached --quiet -- Cargo.toml Cargo.lock deny.toml '*/Cargo.toml'; then
+	cargo +1.98.0 deny check
+else
+	cargo +1.98.0 deny check bans licenses sources
+	echo "verify-rust: advisory check skipped because no dependency change is staged; the push and CI gates run it"
+fi
 cargo +1.98.0 fmt --all --check
 cargo +1.98.0 clippy --workspace --all-targets --all-features --locked -- -D warnings
-cargo +1.98.0 test --workspace --all-targets --all-features --locked
+# Coverage counts every crate in the workspace, tested or not.
+cargo +1.98.0 llvm-cov --workspace --all-targets --all-features --locked --fail-under-lines 80 --fail-under-functions 80 --fail-under-regions 80
 cargo +1.98.0 test --workspace --all-features --doc --locked
 RUSTDOCFLAGS='-D warnings' cargo +1.98.0 doc --workspace --all-features --no-deps --locked
 cargo machete

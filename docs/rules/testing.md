@@ -11,3 +11,5 @@ A test pins an observable contract the code could plausibly violate. Expected va
 Tests are deterministic, parallel-safe, blank local secrets, isolate resources, and leave no process, file, socket, account, or external state behind. Private branching invariants may use unit tests; public behavior belongs in the owning language's integration or public-documentation test surface.
 
 Mock only nondeterministic or process boundaries. Injected clocks, random sources, filesystems, networks, databases, and provider adapters are boundary substitutes; small deterministic fakes for them are allowed. Assertions observe behavior; mock-call assertions may corroborate but never stand alone. Reject pass-through tautologies, snapshot-as-coverage, copied prompt literals, and assertions of type-system guarantees.
+
+The language gates enforce whole-source coverage floors, counting code that no test imports: `.c8rc.json` for TypeScript, `[tool.coverage]` in `pyproject.toml` for Python, and the `cargo llvm-cov` thresholds in `scripts/verify-rust.sh` for Rust. Keep or raise the floors. When coverage drops, add behavioral tests; never lower a floor or exclude production code to pass.

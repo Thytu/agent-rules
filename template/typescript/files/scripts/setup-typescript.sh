@@ -1,6 +1,19 @@
 #!/usr/bin/env bash
 set -euo pipefail
 root="$(cd "$(dirname "$0")/.." && pwd -P)"
+tools="$root/.agent-rules/tools"
+toolchain_only=false
+while [ "$#" -gt 0 ]; do
+	case "$1" in
+		--toolchain-only) toolchain_only=true ;;
+		--tools-dir)
+			shift
+			tools="${1:?setup-typescript: --tools-dir requires a path}"
+			;;
+		*) echo "setup-typescript: unknown argument $1" >&2; exit 2 ;;
+	esac
+	shift
+done
 version=22.22.0
 os="$(uname -s)"
 arch="$(uname -m)"
@@ -13,7 +26,6 @@ case "$os-$arch" in
 esac
 archive="node-v${version}-${platform}.tar.gz"
 cache="${XDG_CACHE_HOME:-$HOME/.cache}/agent-rules/$archive"
-tools="$root/.agent-rules/tools"
 target="$tools/node-v$version"
 mkdir -p "$(dirname "$cache")" "$tools"
 if [ ! -f "$cache" ]; then curl --connect-timeout 10 --max-time 300 -fsSL "https://nodejs.org/dist/v${version}/${archive}" -o "$cache"; fi
@@ -56,5 +68,6 @@ child.on("exit", (code) => {
 });
 JS
 "$tools/node/bin/node" "$runner" 300000 "$tools/node/bin/corepack" prepare pnpm@10.20.0 --activate
+[ "$toolchain_only" = false ] || exit 0
 cd "$root"
 "$tools/node/bin/node" "$runner" 300000 "$tools/node/bin/pnpm" install --frozen-lockfile
