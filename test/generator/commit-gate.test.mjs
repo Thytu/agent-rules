@@ -26,13 +26,14 @@ const generated = resolve(
 function repository(t) {
 	const root = mkdtempSync(join(tmpdir(), "commit-gate-"));
 	t.after(() => rmSync(root, { recursive: true, force: true }));
+	// Hooks export GIT_DIR; inherited, it would point Git at this checkout.
 	const env = {
-		...process.env,
+		...Object.fromEntries(
+			Object.entries(process.env).filter(([name]) => !name.startsWith("GIT_")),
+		),
 		GIT_CONFIG_NOSYSTEM: "1",
 		GIT_CONFIG_GLOBAL: join(root, ".git", "empty-config"),
 	};
-	for (const key of Object.keys(env))
-		if (/^GIT_(DIR|WORK_TREE|INDEX_FILE)$/.test(key)) delete env[key];
 	const git = (...args) =>
 		spawnSync("git", args, {
 			cwd: root,

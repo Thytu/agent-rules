@@ -151,6 +151,10 @@ test("workflow triggers use least privilege", () => {
 test("merge-base diff excludes base-only changes and expands renames", (t) => {
 	const repo = mkdtempSync(join(tmpdir(), "agent-rules-diff-"));
 	t.after(() => rmSync(repo, { recursive: true, force: true }));
+	// Hooks export GIT_DIR; inherited, it would point these commands at this checkout.
+	const env = Object.fromEntries(
+		Object.entries(process.env).filter(([name]) => !name.startsWith("GIT_")),
+	);
 	const git = (...args) =>
 		execFileSync(
 			"git",
@@ -163,7 +167,7 @@ test("merge-base diff excludes base-only changes and expands renames", (t) => {
 				repo,
 				...args,
 			],
-			{ encoding: "utf8" },
+			{ encoding: "utf8", env },
 		).trim();
 	git("init", "-b", "main");
 	writeFileSync(join(repo, "old.txt"), "old\n");

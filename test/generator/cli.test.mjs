@@ -18,6 +18,10 @@ import { fileURLToPath } from "node:url";
 // The command-line contract of init.sh: every request that cannot proceed says
 // why and how to fix it, and only a confirmed, valid request changes anything.
 const sourceRoot = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
+// Hooks export GIT_DIR; inherited, it would point Git at this checkout.
+const env = Object.fromEntries(
+	Object.entries(process.env).filter(([name]) => !name.startsWith("GIT_")),
+);
 
 function git(root, ...args) {
 	return execFileSync(
@@ -31,7 +35,7 @@ function git(root, ...args) {
 			root,
 			...args,
 		],
-		{ encoding: "utf8" },
+		{ encoding: "utf8", env },
 	).trim();
 }
 
@@ -84,7 +88,7 @@ function init(root, args, input) {
 		cwd: root,
 		encoding: "utf8",
 		input,
-		env: { ...process.env, NO_COLOR: "1" },
+		env: { ...env, NO_COLOR: "1" },
 	});
 	return { ...result, output: `${result.stdout}${result.stderr}` };
 }

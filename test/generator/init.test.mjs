@@ -20,9 +20,12 @@ import { fileURLToPath } from "node:url";
 import { test } from "node:test";
 
 const sourceRoot = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
+// Git exports GIT_DIR and friends to hooks; a test that inherited them would
+// run its Git commands against this checkout instead of its own repository.
 const isolatedEnvironment = Object.fromEntries(
 	Object.entries(globalThis.process.env).filter(
 		([name]) =>
+			!name.startsWith("GIT_") &&
 			!/(?:TOKEN|SECRET|PASSWORD|CREDENTIAL|API_KEY|ACCESS_KEY|PRIVATE_KEY)/i.test(
 				name,
 			),
@@ -42,7 +45,7 @@ function git(root, ...args) {
 			root,
 			...args,
 		],
-		{ encoding: "utf8" },
+		{ encoding: "utf8", env: isolatedEnvironment },
 	).trim();
 }
 
