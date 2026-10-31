@@ -10,6 +10,7 @@ import {
 	readdirSync,
 	readFileSync,
 	readlinkSync,
+	renameSync,
 	rmSync,
 	writeFileSync,
 } from "node:fs";
@@ -73,25 +74,25 @@ function repository(t, remote = "https://github.com/example/product.git") {
 	return { root, temp };
 }
 
-function runInit(root, mode, extraEnv = {}) {
-	return execFileSync(join(root, "init.sh"), [mode], {
+function runInit(root, args, extraEnv = {}) {
+	return execFileSync(join(root, "init.sh"), args, {
 		cwd: root,
 		encoding: "utf8",
 		env: { ...isolatedEnvironment, PATH: inheritedPath, ...extraEnv },
 		stdio: isolatedEnvironment.DEBUG_INIT === "1" ? "inherit" : undefined,
 	});
 }
-const liveModes = new Set([
-	"python",
-	"rust",
-	"typescript",
-	"python,rust,typescript",
-]);
 
 function stubToolBoundaries(root, temp) {
 	const bin = join(temp, "tool-bin");
 	mkdirSync(bin);
-	for (const command of ["taplo", "typos", "cargo-deny", "cargo-machete"]) {
+	for (const command of [
+		"taplo",
+		"typos",
+		"cargo-deny",
+		"cargo-llvm-cov",
+		"cargo-machete",
+	]) {
 		const path = join(bin, command);
 		writeFileSync(path, "#!/usr/bin/env bash\nexit 0\n");
 		chmodSync(path, 0o755);
@@ -172,7 +173,13 @@ function paths(root) {
 				rel.endsWith("/__pycache__") ||
 				rel.startsWith(".agent-rules/tools/") ||
 				rel === "target" ||
-				rel.startsWith("target/")
+				rel.startsWith("target/") ||
+				rel === "coverage" ||
+				rel.startsWith("coverage/") ||
+				rel === ".next" ||
+				rel.startsWith(".next/") ||
+				rel === "next-env.d.ts" ||
+				rel.endsWith(".tsbuildinfo")
 			)
 				continue;
 			result.push(rel + (lstatSync(path).isDirectory() ? "/" : ""));
@@ -201,7 +208,7 @@ function snapshot(root) {
 	return hash.digest("hex");
 }
 
-function exerciseGitHubSetup(root, temp) {
+function exerciseGitHubSetup(root, temp, requiredChecks) {
 	const bin = join(temp, "github-bin");
 	const state = join(temp, "github-state");
 	const log = join(temp, "gh.log");
@@ -221,7 +228,7 @@ case "$*" in
 	"api -X PUT repos/org/repo/vulnerability-alerts") printf 'enabled\n' > "$GH_STATE/vulnerability-alerts" ;;
 	"api repos/org/repo/rulesets") printf '[]\n' ;;
 esac
-case " $* " in *" --input - "*) cat >/dev/null ;; esac
+case " $* " in *" --input - "*) cat >> "$GH_LOG" ; printf '\n' >> "$GH_LOG" ;; esac
 `,
 	);
 	chmodSync(gh, 0o755);
@@ -246,24 +253,96 @@ case " $* " in *" --input - "*) cat >/dev/null ;; esac
 	);
 	assert.match(initial, /security pull-request preference preserved/);
 	assert.match(rerun, /security pull-request preference preserved/);
+	const rulesets = calls
+		.split("\n")
+		.filter((line) => line.startsWith('{"name":'))
+		.map((line) => JSON.parse(line));
+	assert.ok(rulesets.length >= 2, calls);
+	for (const ruleset of rulesets) assert.deepEqual(ruleset.bypass_actors, []);
+	const checks = rulesets
+		.find((ruleset) => ruleset.name === "Main is PR-only")
+		.rules.find((rule) => rule.type === "required_status_checks")
+		.parameters.required_status_checks;
+	assert.deepEqual(
+		checks.map(({ context }) => context),
+		requiredChecks,
+	);
+	for (const check of checks) assert.equal(check.integration_id, 15368);
 }
 
-for (const mode of [
-	"python",
-	"rust",
-	"typescript",
-	"python,rust",
-	"python,typescript",
-	"rust,typescript",
-	"python,rust,typescript",
-]) {
-	const live = liveModes.has(mode);
-	test(`${live ? "materializes and exercises" : "materializes"} ${mode}`, {
+// commitAll stages the whole tree and commits it through the commit gate.
+function commitAll(root, message) {
+	git(root, "add", "-A");
+	const result = spawnSync(
+		"git",
+		[
+			"-c",
+			"user.name=Generator Test",
+			"-c",
+			"user.email=test@example.com",
+			"-C",
+			root,
+			"commit",
+			"-qm",
+			message,
+		],
+		{ encoding: "utf8", env: isolatedEnvironment },
+	);
+	assert.equal(result.status, 0, `${result.stdout}${result.stderr}`);
+	assert.match(result.stderr, /commit gate: passed/);
+}
+
+const addonRows = {
+	react: "| React |",
+	nextjs: "| Next.js |",
+	tailwind: "| Tailwind CSS |",
+	database: "| Data access |",
+};
+
+const cases = [
+	{ name: "python", args: ["python"], live: true },
+	{ name: "rust", args: ["rust"], live: true },
+	{ name: "typescript", args: ["typescript"], live: true },
+	{ name: "python,rust", args: ["python,rust"] },
+	{ name: "python,typescript", args: ["python,typescript"] },
+	{ name: "rust,typescript", args: ["rust,typescript"] },
+	{
+		name: "python,rust,typescript",
+		args: ["python,rust,typescript"],
+		live: true,
+	},
+	{
+		name: "typescript with react, tailwind, and sqlite",
+		args: ["typescript", "--with", "react,tailwind,database=sqlite"],
+		golden: "typescript--react-tailwind-database-sqlite",
+		live: true,
+	},
+	{
+		name: "typescript with nextjs, tailwind, and postgresql",
+		args: ["typescript", "--with", "nextjs,tailwind,database=postgresql"],
+		golden: "typescript--nextjs-tailwind-database-postgresql",
+		live: true,
+	},
+	{
+		name: "python and typescript with nextjs",
+		args: ["typescript,python", "--with", "nextjs"],
+		golden: "python-typescript--nextjs",
+	},
+];
+
+for (const { name, args, live = false, golden } of cases) {
+	const languages = args[0].split(",");
+	const withList = args[args.indexOf("--with") + 1] ?? "";
+	const addons = args.includes("--with")
+		? withList.split(",").map((addon) => addon.split("=")[0])
+		: [];
+	if (addons.includes("nextjs")) addons.push("react");
+	test(`${live ? "materializes and exercises" : "materializes"} ${name}`, {
 		timeout: 20 * 60_000,
 	}, (t) => {
 		const { root, temp } = repository(t);
 		const path = live ? inheritedPath : stubToolBoundaries(root, temp);
-		runInit(root, mode, {
+		runInit(root, args, {
 			GIT_DIR: join(temp, "wrong.git"),
 			GIT_CONFIG_COUNT: "1",
 			GIT_CONFIG_KEY_0: "core.worktree",
@@ -271,24 +350,18 @@ for (const mode of [
 			PATH: path,
 		});
 		assert.equal(lstatSync(join(root, "CLAUDE.md")).isSymbolicLink(), true);
-		assert.equal(
-			Boolean(mode.includes("rust")),
-			lstatSync(join(root, "Cargo.toml"), {
-				throwIfNoEntry: false,
-			})?.isFile() ?? false,
-		);
-		assert.equal(
-			Boolean(mode.includes("typescript")),
-			lstatSync(join(root, "package.json"), {
-				throwIfNoEntry: false,
-			})?.isFile() ?? false,
-		);
-		assert.equal(
-			Boolean(mode.includes("python")),
-			lstatSync(join(root, "pyproject.toml"), {
-				throwIfNoEntry: false,
-			})?.isFile() ?? false,
-		);
+		for (const [language, manifest] of [
+			["rust", "Cargo.toml"],
+			["typescript", "package.json"],
+			["python", "pyproject.toml"],
+		])
+			assert.equal(
+				languages.includes(language),
+				lstatSync(join(root, manifest), {
+					throwIfNoEntry: false,
+				})?.isFile() ?? false,
+				manifest,
+			);
 		assert.equal(
 			lstatSync(join(root, "init.sh"), { throwIfNoEntry: false }),
 			undefined,
@@ -311,19 +384,18 @@ for (const mode of [
 			"testing",
 		])
 			assert.match(agentMap, new RegExp(`docs/rules/${owner}\\.md`));
-		assert.equal(
-			agentMap.includes("Rust implementation"),
-			mode.includes("rust"),
-		);
-		assert.equal(
-			agentMap.includes("TypeScript implementation"),
-			mode.includes("typescript"),
-		);
-		assert.equal(
-			agentMap.includes("Python implementation"),
-			mode.includes("python"),
-		);
+		for (const [language, row] of [
+			["rust", "Rust implementation"],
+			["typescript", "TypeScript implementation"],
+			["python", "Python implementation"],
+		])
+			assert.equal(agentMap.includes(row), languages.includes(language), row);
+		for (const [addon, row] of Object.entries(addonRows))
+			assert.equal(agentMap.includes(row), addons.includes(addon), row);
 		assert.doesNotMatch(agentMap, /docs\/profiles|LANGUAGE_ROWS/);
+		const readme = readFileSync(join(root, "README.md"), "utf8");
+		assert.match(readme, /Materialized with: `\.\/init\.sh /);
+		assert.doesNotMatch(readme, /<!-- SELECTION -->/);
 		const pullRequestTemplate = readFileSync(
 			join(root, ".github", "PULL_REQUEST_TEMPLATE.md"),
 			"utf8",
@@ -335,25 +407,30 @@ for (const mode of [
 		);
 		assert.match(pullRequestTemplate, /\| Procedure \| Evidence \|/);
 		assert.match(pullRequestTemplate, /\| Risk \| Bound \|/);
-		exerciseGitHubSetup(root, temp);
+		exerciseGitHubSetup(root, temp, [
+			"PR targets main",
+			"Repository quality",
+			"Gitleaks",
+			...(addons.includes("nextjs") ? ["Bundle budgets"] : []),
+		]);
 		const actual = `${paths(root).join("\n")}\n`;
-		const golden = join(
+		const goldenFile = join(
 			sourceRoot,
 			"test",
 			"generator",
 			"golden",
-			`${mode.replaceAll(",", "-")}.paths`,
+			`${golden ?? name.replaceAll(",", "-")}.paths`,
 		);
 		if (isolatedEnvironment.UPDATE_GOLDENS === "1")
-			writeFileSync(golden, actual);
-		else assert.equal(actual, readFileSync(golden, "utf8"));
+			writeFileSync(goldenFile, actual);
+		else assert.equal(actual, readFileSync(goldenFile, "utf8"));
 		writeFileSync(
 			join(root, ".github", "dependabot.yml"),
 			"version: 2\nupdates:\n  - package-ecosystem: github-actions\n    directory: /\n    schedule:\n      interval: monthly\n",
 		);
 		mkdirSync(join(root, "app"), { recursive: true });
 		writeFileSync(join(root, "app", "product.txt"), "product-owned\n");
-		if (mode === "rust") {
+		if (name === "rust") {
 			writeFileSync(
 				join(root, "package.json"),
 				'{"name":"rust-product-metadata","private":true}\n',
@@ -363,7 +440,91 @@ for (const mode of [
 			cwd: root,
 			env: isolatedEnvironment,
 		});
-		if (mode === "python") {
+		if (addons.includes("nextjs")) {
+			// An add-on is all present or all absent, and nextjs needs react.
+			const owned = join(root, "docs", "rules", "react.md");
+			const content = readFileSync(owned);
+			rmSync(owned);
+			const incomplete = spawnSync(
+				"bash",
+				["scripts/verify.sh", "--structure-only"],
+				{
+					cwd: root,
+					encoding: "utf8",
+					env: isolatedEnvironment,
+				},
+			);
+			assert.notEqual(incomplete.status, 0);
+			assert.match(
+				incomplete.stderr,
+				/the react add-on is incomplete: missing docs\/rules\/react\.md/,
+			);
+			for (const file of [
+				"tooling/eslint-config/react.mjs",
+				"test/eslint/react.test.mjs",
+			])
+				renameSync(join(root, file), join(temp, file.replaceAll("/", "-")));
+			const orphaned = spawnSync(
+				"bash",
+				["scripts/verify.sh", "--structure-only"],
+				{
+					cwd: root,
+					encoding: "utf8",
+					env: isolatedEnvironment,
+				},
+			);
+			assert.match(
+				orphaned.stderr,
+				/the nextjs add-on requires the react add-on/,
+			);
+			for (const file of [
+				"tooling/eslint-config/react.mjs",
+				"test/eslint/react.test.mjs",
+			])
+				renameSync(join(temp, file.replaceAll("/", "-")), join(root, file));
+			writeFileSync(owned, content);
+		}
+		if (!live) return;
+		commitAll(root, "chore: initialize repository");
+		if (addons.includes("react")) {
+			// A rule violation stops the commit before Git records it.
+			mkdirSync(join(root, "src", "ui"), { recursive: true });
+			writeFileSync(
+				join(root, "src", "ui", "title.tsx"),
+				'import { useEffect } from "react";\n\nexport function Title({ title }: { title: string }) {\n\tuseEffect(() => {\n\t\tdocument.title = title;\n\t}, []);\n\treturn null;\n}\n',
+			);
+			git(root, "add", "-A");
+			const head = git(root, "rev-parse", "HEAD");
+			const rejected = spawnSync(
+				"git",
+				[
+					"-c",
+					"user.name=Generator Test",
+					"-c",
+					"user.email=test@example.com",
+					"-C",
+					root,
+					"commit",
+					"-qm",
+					"feat: add title",
+				],
+				{ encoding: "utf8", env: isolatedEnvironment },
+			);
+			assert.notEqual(rejected.status, 0);
+			assert.match(
+				`${rejected.stdout}${rejected.stderr}`,
+				/react-hooks\/exhaustive-deps/,
+			);
+			assert.equal(git(root, "rev-parse", "HEAD"), head);
+			git(root, "reset", "-q");
+			rmSync(join(root, "src", "ui"), { recursive: true });
+		}
+		execFileSync("bash", ["scripts/verify.sh"], {
+			cwd: root,
+			env: isolatedEnvironment,
+			stdio: isolatedEnvironment.DEBUG_INIT === "1" ? "inherit" : undefined,
+		});
+		if (name === "python") {
 			mkdirSync(join(root, "src"), { recursive: true });
 			mkdirSync(join(root, "tests"), { recursive: true });
 			writeFileSync(
@@ -374,6 +535,7 @@ for (const mode of [
 				join(root, "tests", "test_product.py"),
 				"from product import Product, doubled\n\n\ndef test_doubled() -> None:\n    assert doubled(Product(value=21)) == 42\n",
 			);
+			commitAll(root, "feat: add product code");
 			execFileSync("bash", ["scripts/verify.sh"], {
 				cwd: root,
 				env: isolatedEnvironment,
@@ -426,7 +588,7 @@ for (const mode of [
 			}
 			rmSync(invalidPython);
 		}
-		if (mode === "typescript") {
+		if (name === "typescript") {
 			mkdirSync(join(root, "test", "product"), { recursive: true });
 			writeFileSync(
 				join(root, "test", "product", "value.test.ts"),
@@ -440,6 +602,7 @@ for (const mode of [
 				join(root, "test", "product", "ignored.test.mjs"),
 				'throw new Error("unsupported test extension executed");\n',
 			);
+			commitAll(root, "feat: add product code");
 			execFileSync("bash", ["scripts/verify.sh"], {
 				cwd: root,
 				env: isolatedEnvironment,
@@ -466,7 +629,7 @@ for (const mode of [
 			);
 			rmSync(objectPrototypeCheck);
 		}
-		if (mode === "rust") {
+		if (name === "rust") {
 			const cargoPath = join(root, "Cargo.toml");
 			writeFileSync(
 				cargoPath,
@@ -485,18 +648,19 @@ for (const mode of [
 			);
 			writeFileSync(
 				join(root, "crates", "helper", "src", "lib.rs"),
-				"#[must_use]\npub const fn answer() -> u32 {\n    42\n}\n",
+				"#[must_use]\npub const fn answer() -> u32 {\n    42\n}\n\n#[cfg(test)]\nmod tests {\n    #[test]\n    fn answers_42() {\n        assert_eq!(super::answer(), 42);\n    }\n}\n",
 			);
 			const productManifestPath = join(root, "crates", "product", "Cargo.toml");
 			writeFileSync(productManifestPath, productManifest);
 			writeFileSync(
 				join(root, "crates", "product", "src", "lib.rs"),
-				"#[must_use]\npub const fn answer() -> u32 {\n    helper::answer()\n}\n",
+				"#[must_use]\npub const fn answer() -> u32 {\n    helper::answer()\n}\n\n#[cfg(test)]\nmod tests {\n    #[test]\n    fn delegates_to_helper() {\n        assert_eq!(super::answer(), 42);\n    }\n}\n",
 			);
 			execFileSync("cargo", ["+1.98.0", "generate-lockfile"], {
 				cwd: root,
 				env: isolatedEnvironment,
 			});
+			commitAll(root, "feat: add product code");
 			execFileSync("bash", ["scripts/verify.sh"], {
 				cwd: root,
 				env: isolatedEnvironment,
