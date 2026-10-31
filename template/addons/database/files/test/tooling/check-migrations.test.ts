@@ -31,8 +31,16 @@ function repository(context: TestContext) {
 		'#!/bin/sh\nexit "${DRIZZLE_STATUS:-0}"\n',
 	);
 	fs.chmodSync(path.join(bin, "drizzle-kit"), 0o755);
+	// The commit gate runs this test inside a Git hook, which exports GIT_DIR
+	// and GIT_INDEX_FILE; inherited, they would aim the scratch repository's
+	// commands at the commit being made.
+	const hookGit = Object.keys(process.env)
+		.filter((name) => name.startsWith("GIT_"))
+		.map((name) => [name, undefined]);
+	// A child process receives no variable whose value is undefined.
 	const env = {
 		...process.env,
+		...Object.fromEntries(hookGit),
 		PATH: `${bin}${path.delimiter}${process.env.PATH ?? ""}`,
 		GIT_CONFIG_GLOBAL: path.join(root, ".gitconfig"),
 		GIT_CONFIG_NOSYSTEM: "1",
