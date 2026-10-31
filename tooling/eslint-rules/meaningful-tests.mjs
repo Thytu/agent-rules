@@ -54,6 +54,63 @@ function isImportedIdentifier(node, scope) {
 	return false;
 }
 
+function isIdentifier(node, name) {
+	return node?.type === "Identifier" && node.name === name;
+}
+
+function isMemberCall(callee, object, property) {
+	return (
+		callee.type === "MemberExpression" &&
+		isIdentifier(callee.object, object) &&
+		isIdentifier(callee.property, property)
+	);
+}
+
+// node:assert calls and RuleTester runs are outcome assertions.
+function isAssertCall(callee) {
+	if (isIdentifier(callee, "assert")) return true;
+	return (
+		(callee.type === "MemberExpression" &&
+			isIdentifier(callee.object, "assert")) ||
+		isMemberCall(callee, "ruleTester", "run")
+	);
+}
+
+function isViMock(callee) {
+	return isMemberCall(callee, "vi", "mock");
+}
+
+function isLocalSpecifier(spec) {
+	return (
+		spec?.type === "Literal" &&
+		typeof spec.value === "string" &&
+		(spec.value.startsWith(".") || spec.value.startsWith("~"))
+	);
+}
+
+function countAssertion(current, observesOutcome) {
+	if (!current) return;
+	current.expects += 1;
+	if (observesOutcome) current.nonCallExpects += 1;
+}
+
+function reportExpectChain(context, node, chain) {
+	if (
+		chain.matcher === "toMatchSnapshot" ||
+		chain.matcher === "toMatchFileSnapshot"
+	) {
+		context.report({ node, messageId: "externalSnapshot" });
+	}
+	if (
+		LITERAL_MATCHERS.has(chain.matcher) &&
+		isImportedIdentifier(chain.expectArg, context.sourceCode.getScope(node)) &&
+		node.arguments[0]?.type === "Literal" &&
+		typeof node.arguments[0].value === "string"
+	) {
+		context.report({ node, messageId: "importedLiteral" });
+	}
+}
+
 export const meaningfulTests = {
 	meta: {
 		type: "problem",
@@ -77,68 +134,21 @@ export const meaningfulTests = {
 	},
 	create(context) {
 		const testStack = [];
+		const currentTest = () => testStack[testStack.length - 1];
 		return {
 			CallExpression(node) {
 				if (isTestCall(node)) {
 					testStack.push({ node, expects: 0, nonCallExpects: 0 });
-					return;
-				}
-				const current = testStack[testStack.length - 1];
-				const directAssert =
-					node.callee.type === "Identifier" && node.callee.name === "assert";
-				const assertionMember =
-					node.callee.type === "MemberExpression" &&
-					node.callee.object.type === "Identifier" &&
-					(node.callee.object.name === "assert" ||
-						(node.callee.object.name === "ruleTester" &&
-							node.callee.property.type === "Identifier" &&
-							node.callee.property.name === "run"));
-				if (current && (directAssert || assertionMember)) {
-					current.expects += 1;
-					current.nonCallExpects += 1;
-					return;
-				}
-				if (
-					node.callee.type === "MemberExpression" &&
-					node.callee.object.type === "Identifier" &&
-					node.callee.object.name === "vi" &&
-					node.callee.property.type === "Identifier" &&
-					node.callee.property.name === "mock"
-				) {
-					const spec = node.arguments[0];
-					if (
-						spec?.type === "Literal" &&
-						typeof spec.value === "string" &&
-						(spec.value.startsWith(".") || spec.value.startsWith("~"))
-					) {
+				} else if (isAssertCall(node.callee)) {
+					countAssertion(currentTest(), true);
+				} else if (isViMock(node.callee)) {
+					if (isLocalSpecifier(node.arguments[0]))
 						context.report({ node, messageId: "siblingMock" });
-					}
-					return;
-				}
-				const chain = expectChain(node);
-				if (!chain) return;
-				const currentExpectation = testStack[testStack.length - 1];
-				if (currentExpectation) {
-					currentExpectation.expects += 1;
-					if (!CALL_MATCHERS.has(chain.matcher))
-						currentExpectation.nonCallExpects += 1;
-				}
-				if (
-					chain.matcher === "toMatchSnapshot" ||
-					chain.matcher === "toMatchFileSnapshot"
-				) {
-					context.report({ node, messageId: "externalSnapshot" });
-				}
-				if (
-					LITERAL_MATCHERS.has(chain.matcher) &&
-					isImportedIdentifier(
-						chain.expectArg,
-						context.sourceCode.getScope(node),
-					) &&
-					node.arguments[0]?.type === "Literal" &&
-					typeof node.arguments[0].value === "string"
-				) {
-					context.report({ node, messageId: "importedLiteral" });
+				} else {
+					const chain = expectChain(node);
+					if (!chain) return;
+					countAssertion(currentTest(), !CALL_MATCHERS.has(chain.matcher));
+					reportExpectChain(context, node, chain);
 				}
 			},
 			"CallExpression:exit"(node) {
