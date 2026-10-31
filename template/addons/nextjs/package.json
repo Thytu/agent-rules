@@ -5,7 +5,6 @@
 		"start": "next start",
 		"typecheck": "next typegen && tsc --noEmit",
 		"test": "c8 node --import=tsx --import=./test/support/register-asset-imports.mjs --test 'test/eslint/**/*.test.mjs' 'test/**/*.test.ts' 'test/**/*.test.tsx'",
-		"test:results": "node --import=tsx --import=./test/support/register-asset-imports.mjs --test --test-reporter=spec --test-reporter-destination=stderr --test-reporter=./tooling/test-results-reporter.mjs --test-reporter-destination=stdout 'test/eslint/**/*.test.mjs' 'test/**/*.test.ts' 'test/**/*.test.tsx'",
 		"bundle:analyze": "next analyze --output && next analyze export > .next/diagnostics/analyze/bundle-graph.jsonl",
 		"bundle:check": "node tooling/check-bundle-budgets.mjs"
 	},

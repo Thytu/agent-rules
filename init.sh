@@ -348,7 +348,7 @@ print_plan() {
 	extra="$(gate_list full_gates)"
 	printf '  %-12s %s\n' "Push and CI" "the commit gate plus dependency advisories and a full-history secret scan${extra:+; $extra}"
 	extra="$(gate_list ci_gates)"
-	printf '  %-12s %s\n' "CI only" "test stability on main (three runs)${extra:+; $extra}"
+	[ -z "$extra" ] || printf '  %-12s %s\n' "CI only" "$extra"
 	printf '\n'
 }
 

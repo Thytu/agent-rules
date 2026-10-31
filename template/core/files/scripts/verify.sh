@@ -173,7 +173,7 @@ if [ "$mode" = source ]; then
 	exit 0
 fi
 
-for path in AGENTS.md CLAUDE.md README.md docs/rules .githooks .gitleaks.toml .jscpd.json .github/workflows/ci.yml .github/workflows/pull-request.yml .github/workflows/secret-scanning.yml scripts/setup.sh scripts/setup-github.sh scripts/verify.sh scripts/verify-commit.sh scripts/verify-mode.sh scripts/test-stability.sh scripts/guard-append-only.sh scripts/commit-msg.sh; do require "$path"; done
+for path in AGENTS.md CLAUDE.md README.md docs/rules .githooks .gitleaks.toml .jscpd.json .github/workflows/ci.yml .github/workflows/pull-request.yml .github/workflows/secret-scanning.yml scripts/setup.sh scripts/setup-github.sh scripts/verify.sh scripts/verify-commit.sh scripts/verify-mode.sh scripts/guard-append-only.sh scripts/commit-msg.sh; do require "$path"; done
 for forbidden in init.sh template tooling/pr-review test/generator scripts/setup-source.sh .agents .claude docs/profiles; do [ ! -e "$root/$forbidden" ] || fail "generator path survived: $forbidden"; done
 check_addons
 check_map "$root/AGENTS.md"

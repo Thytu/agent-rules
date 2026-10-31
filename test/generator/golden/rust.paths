@@ -42,7 +42,6 @@ scripts/guard-append-only.sh
 scripts/setup-github.sh
 scripts/setup-rust.sh
 scripts/setup.sh
-scripts/test-stability.sh
 scripts/verify-commit.sh
 scripts/verify-mode.sh
 scripts/verify-rust.sh

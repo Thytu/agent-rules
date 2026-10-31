@@ -25,7 +25,7 @@ Agents and scripts pass the same choices as arguments:
 | Languages | `python`, `rust`, `typescript`: one or more, in any order |
 | Add-ons (`--with`) | `react`, `nextjs` (includes `react`), `tailwind`, `database=postgresql`, `database=sqlite` |
 
-Every language brings formatting, lint, types, tests with whole-source coverage floors, and dependency audits. Every repository gets the commit gate, the push gate, secret scanning, file-size and duplication limits, and a flaky-test check on `main`. Add-ons add their own lint rules, rule documents, checks, and tests:
+Every language brings formatting, lint, types, tests with whole-source coverage floors, and dependency audits. Every repository gets the commit gate, the push gate, secret scanning, and file-size and duplication limits. Add-ons add their own lint rules, rule documents, checks, and tests:
 
 | Add-on | Adds |
 |---|---|

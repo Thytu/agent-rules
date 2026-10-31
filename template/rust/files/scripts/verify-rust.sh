@@ -12,19 +12,6 @@ trap 'rm -f "$metadata"' EXIT
 cargo +1.98.0 metadata --format-version 1 --no-deps --locked > "$metadata"
 
 toml=(Cargo.toml .cargo/config.toml clippy.toml deny.toml rust-toolchain.toml rustfmt.toml)
-if [ "$mode" = results ]; then
-	if grep -q '"packages":\[\]' "$metadata"; then
-		: > "$results"
-		echo "verify-rust: the workspace has no crates, so there are no tests to run" >&2
-		exit 0
-	fi
-	# libtest prints "test NAME ... OUTCOME"; the binary name keeps the same test
-	# path in two crates apart.
-	cargo +1.98.0 test --workspace --all-targets --all-features --locked --no-fail-fast 2>&1 | tee /dev/stderr |
-		awk '/^ *Running / { binary = $0; sub(/^.*\(/, "", binary); sub(/\).*$/, "", binary); count = split(binary, parts, "/"); binary = parts[count]; sub(/-[0-9a-f]+$/, "", binary) }
-			/^test .* \.\.\. (ok|FAILED|ignored)/ { outcome = $4; sub(/,$/, "", outcome); print tolower(outcome) "\t" binary "::" $2 }' > "$results"
-	exit 0
-fi
 if grep -q '"packages":\[\]' "$metadata"; then
 	taplo format --check "${toml[@]}"
 	taplo lint "${toml[@]}"

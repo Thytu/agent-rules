@@ -11,11 +11,6 @@ export COREPACK_HOME="$tools/corepack"
 [ "$(pnpm --version)" = 10.20.0 ] || { echo "verify-typescript: pnpm version mismatch" >&2; exit 1; }
 cd "$root"
 
-if [ "$mode" = results ]; then
-	pnpm --silent run test:results > "$results"
-	exit 0
-fi
-
 # A commit runs the advisory audit only when it changes dependencies: an
 # advisory published for an unchanged lockfile is not caused by the commit, and
 # the push and CI gates still run the audit on every change.

@@ -45,7 +45,6 @@ scripts/setup-github.sh
 scripts/setup-python.sh
 scripts/setup-typescript.sh
 scripts/setup.sh
-scripts/test-stability.sh
 scripts/verify-commit.sh
 scripts/verify-mode.sh
 scripts/verify-python.sh
@@ -69,7 +68,6 @@ tooling/eslint-rules/no-generic-instanceof.mjs
 tooling/eslint-rules/no-long-comments.mjs
 tooling/eslint-rules/no-loose-variant-objects.mjs
 tooling/eslint-rules/no-runtime-typeof.mjs
-tooling/test-results-reporter.mjs
 tsconfig.json
 types/
 types/global.d.ts
