@@ -1,0 +1,7 @@
+# Secret scanning policy. The default rules cover common credential formats.
+# Add an allowlist entry only for a value proven not to be a credential, scoped
+# to its path and exact value, with a description saying why.
+title = "Committed-secret scanning"
+
+[extend]
+useDefault = true

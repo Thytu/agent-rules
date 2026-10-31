@@ -1,0 +1,1 @@
+| Data access | changing the Drizzle schema, migrations, queries, or database adapters | `docs/rules/data-access.md`, `drizzle.config.ts` |

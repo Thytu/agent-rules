@@ -1,0 +1,31 @@
+{
+	"threshold": 0,
+	"minLines": 5,
+	"minTokens": 50,
+	"mode": "mild",
+	"format": [
+		"bash",
+		"css",
+		"javascript",
+		"jsx",
+		"python",
+		"rust",
+		"tsx",
+		"typescript"
+	],
+	"ignore": [
+		"**/*.test.*",
+		"**/test_*.py",
+		"**/*_test.py",
+		"test/**",
+		"tests/**",
+		".agent-rules/**",
+		"**/node_modules/**",
+		"**/dist/**",
+		"**/build/**",
+		"**/target/**",
+		"**/.venv/**"
+	],
+	"reporters": ["console"],
+	"gitignore": true
+}

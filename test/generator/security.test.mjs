@@ -5,6 +5,7 @@ import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { test } from "node:test";
+import { isolatedEnvironment } from "./environment.mjs";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 
@@ -46,26 +47,47 @@ test("append-only guard permits ordinary commits and rejects amend", () => {
 	);
 });
 
-test("pre-commit stays fast while pre-push runs the full gate", () => {
+test("commit hooks verify the staged tree while pre-push runs the full gate", () => {
 	const sourceCommit = readFileSync(
 		join(root, ".githooks", "pre-commit"),
 		"utf8",
 	);
 	const sourcePush = readFileSync(join(root, ".githooks", "pre-push"), "utf8");
 	const generatedHooks = join(root, "template", "core", "files", ".githooks");
-	const generatedCommit = readFileSync(
-		join(generatedHooks, "pre-commit"),
-		"utf8",
-	);
-	const generatedPush = readFileSync(join(generatedHooks, "pre-push"), "utf8");
+	const read = (hook) => readFileSync(join(generatedHooks, hook), "utf8");
 
 	assert.match(sourceCommit, /verify\.sh" --source/);
 	assert.match(sourceCommit, /pnpm format:check/);
 	assert.match(sourceCommit, /pnpm lint/);
 	assert.doesNotMatch(sourceCommit, /pnpm verify/);
-	assert.match(generatedCommit, /verify\.sh" --structure-only/);
 	assert.match(sourcePush, /pnpm verify/);
-	assert.match(generatedPush, /verify\.sh"$/m);
+	for (const hook of ["pre-commit", "pre-merge-commit"])
+		assert.match(read(hook), /scripts\/verify-commit\.sh"$/m, hook);
+	assert.match(read("pre-push"), /verify\.sh"$/m);
+	const gate = readFileSync(
+		join(root, "template", "core", "files", "scripts", "verify-commit.sh"),
+		"utf8",
+	);
+	assert.match(gate, /verify\.sh" --commit/);
+});
+
+test("secret scanning is a required pull-request check pinned to GitHub Actions", () => {
+	const workflow = readFileSync(
+		join(
+			root,
+			"template",
+			"core",
+			"files",
+			".github",
+			"workflows",
+			"secret-scanning.yml",
+		),
+		"utf8",
+	);
+	assert.match(workflow, /name: Gitleaks/);
+	assert.match(workflow, /fetch-depth: 0/);
+	assert.match(workflow, /persist-credentials: false/);
+	assert.doesNotMatch(workflow, /secrets\.|pull_request_target:/);
 });
 
 test("workflow triggers use least privilege", () => {
@@ -130,6 +152,7 @@ test("workflow triggers use least privilege", () => {
 test("merge-base diff excludes base-only changes and expands renames", (t) => {
 	const repo = mkdtempSync(join(tmpdir(), "agent-rules-diff-"));
 	t.after(() => rmSync(repo, { recursive: true, force: true }));
+	const env = isolatedEnvironment;
 	const git = (...args) =>
 		execFileSync(
 			"git",
@@ -142,7 +165,7 @@ test("merge-base diff excludes base-only changes and expands renames", (t) => {
 				repo,
 				...args,
 			],
-			{ encoding: "utf8" },
+			{ encoding: "utf8", env },
 		).trim();
 	git("init", "-b", "main");
 	writeFileSync(join(repo, "old.txt"), "old\n");

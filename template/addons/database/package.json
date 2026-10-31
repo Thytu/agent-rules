@@ -1,0 +1,17 @@
+{
+	"scripts": {
+		"db:generate": "drizzle-kit generate",
+		"db:check": "node tooling/check-migrations.mjs"
+	},
+	"dependencies": {
+		"drizzle-orm": "0.45.4"
+	},
+	"devDependencies": {
+		"drizzle-kit": "0.31.11"
+	},
+	"knip": {
+		"entry": [
+			"tooling/eslint-config/database.mjs"
+		]
+	}
+}

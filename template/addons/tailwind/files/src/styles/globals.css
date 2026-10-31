@@ -1,0 +1,6 @@
+@import "tailwindcss";
+
+/* Design tokens. Name every recurring color, type size, radius, and shadow
+   here, then use the generated utilities instead of arbitrary values. */
+@theme {
+}

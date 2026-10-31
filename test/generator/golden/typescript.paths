@@ -1,7 +1,9 @@
 .agent-rules/
+.c8rc.json
 .githooks/
 .githooks/commit-msg
 .githooks/pre-commit
+.githooks/pre-merge-commit
 .githooks/pre-push
 .githooks/pre-rebase
 .githooks/prepare-commit-msg
@@ -10,7 +12,10 @@
 .github/workflows/
 .github/workflows/ci.yml
 .github/workflows/pull-request.yml
+.github/workflows/secret-scanning.yml
 .gitignore
+.gitleaks.toml
+.jscpd.json
 .npmrc
 AGENTS.md
 CLAUDE.md
@@ -25,6 +30,7 @@ docs/rules/contract-evolution.md
 docs/rules/dependency-integrity.md
 docs/rules/efficiency.md
 docs/rules/lifecycle-capacity.md
+docs/rules/naming.md
 docs/rules/testing.md
 eslint.config.mjs
 package.json
@@ -35,13 +41,18 @@ scripts/guard-append-only.sh
 scripts/setup-github.sh
 scripts/setup-typescript.sh
 scripts/setup.sh
+scripts/test-stability.sh
+scripts/verify-commit.sh
+scripts/verify-mode.sh
 scripts/verify-typescript.sh
 scripts/verify.sh
 test/
 test/eslint/
+test/eslint/meaningful-tests.test.mjs
 test/eslint/no-long-comments.test.mjs
 test/eslint/no-loose-variant-objects.test.mjs
 test/eslint/no-runtime-typeof.test.mjs
+test/eslint/repository-config.test.mjs
 tooling/
 tooling/eslint-rules/
 tooling/eslint-rules/index.mjs
@@ -53,6 +64,7 @@ tooling/eslint-rules/no-generic-instanceof.mjs
 tooling/eslint-rules/no-long-comments.mjs
 tooling/eslint-rules/no-loose-variant-objects.mjs
 tooling/eslint-rules/no-runtime-typeof.mjs
+tooling/test-results-reporter.mjs
 tsconfig.json
 types/
 types/global.d.ts

@@ -1,0 +1,28 @@
+{
+	"scripts": {
+		"dev": "next dev",
+		"build": "next build",
+		"start": "next start",
+		"typecheck": "next typegen && tsc --noEmit",
+		"test": "c8 node --import=tsx --import=./test/support/register-asset-imports.mjs --test 'test/eslint/**/*.test.mjs' 'test/**/*.test.ts' 'test/**/*.test.tsx'",
+		"test:results": "node --import=tsx --import=./test/support/register-asset-imports.mjs --test --test-reporter=spec --test-reporter-destination=stderr --test-reporter=./tooling/test-results-reporter.mjs --test-reporter-destination=stdout 'test/eslint/**/*.test.mjs' 'test/**/*.test.ts' 'test/**/*.test.tsx'",
+		"bundle:analyze": "next analyze --output && next analyze export > .next/diagnostics/analyze/bundle-graph.jsonl",
+		"bundle:check": "node tooling/check-bundle-budgets.mjs"
+	},
+	"dependencies": {
+		"next": "16.4.3",
+		"react": "19.3.1",
+		"react-dom": "19.3.1"
+	},
+	"devDependencies": {
+		"@types/react": "19.3.0",
+		"@types/react-dom": "19.3.0",
+		"eslint-config-next": "16.4.3",
+		"zod": "4.6.7"
+	},
+	"knip": {
+		"entry": [
+			"tooling/eslint-config/nextjs.mjs"
+		]
+	}
+}

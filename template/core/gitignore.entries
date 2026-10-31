@@ -1,6 +1,13 @@
 # Generated tools
 .agent-rules/tools/
 
+# Local environment files hold credentials; commit only the documented example
+.env
+.env.*
+!.env.example
+
 # OS and editor
 .DS_Store
 *.swp
+.idea/
+.vscode/

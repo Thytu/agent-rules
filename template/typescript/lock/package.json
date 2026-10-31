@@ -1,0 +1,57 @@
+{
+	"name": "generated-product",
+	"version": "0.0.0",
+	"private": true,
+	"type": "module",
+	"engines": {
+		"node": "22.22.0"
+	},
+	"packageManager": "pnpm@10.20.0",
+	"scripts": {
+		"format": "biome format --write .",
+		"format:check": "biome format .",
+		"lint": "eslint . --max-warnings 0",
+		"typecheck": "tsc --noEmit",
+		"test": "c8 node --import=tsx --test 'test/eslint/**/*.test.mjs' 'test/**/*.test.ts' 'test/**/*.test.tsx'",
+		"test:results": "node --import=tsx --test --test-reporter=spec --test-reporter-destination=stderr --test-reporter=./tooling/test-results-reporter.mjs --test-reporter-destination=stdout 'test/eslint/**/*.test.mjs' 'test/**/*.test.ts' 'test/**/*.test.tsx'",
+		"audit": "pnpm audit --audit-level high",
+		"unused": "knip"
+	},
+	"devDependencies": {
+		"@biomejs/biome": "2.5.7",
+		"@eslint/js": "9.39.5",
+		"@tailwindcss/postcss": "4.3.3",
+		"@types/node": "22.20.1",
+		"@types/react": "19.3.0",
+		"@types/react-dom": "19.3.0",
+		"c8": "12.0.0",
+		"drizzle-kit": "0.31.11",
+		"eslint": "9.39.5",
+		"eslint-config-next": "16.4.3",
+		"eslint-plugin-better-tailwindcss": "4.10.0",
+		"eslint-plugin-jsx-a11y": "6.10.2",
+		"eslint-plugin-react": "7.37.5",
+		"eslint-plugin-react-hooks": "7.1.1",
+		"globals": "17.9.0",
+		"knip": "6.32.2",
+		"tailwindcss": "4.3.3",
+		"tsx": "4.23.12",
+		"typescript": "5.9.3",
+		"typescript-eslint": "8.66.0",
+		"zod": "4.6.7"
+	},
+	"knip": {
+		"entry": [
+			"test/**/*.{mjs,ts,tsx}"
+		],
+		"project": [
+			"types/**/*.d.ts"
+		]
+	},
+	"dependencies": {
+		"drizzle-orm": "0.45.4",
+		"next": "16.4.3",
+		"react": "19.3.1",
+		"react-dom": "19.3.1"
+	}
+}

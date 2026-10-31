@@ -15,7 +15,8 @@
 		"test": "node --test test/*/*.test.mjs",
 		"test:generator": "node --test test/generator/*.test.mjs",
 		"audit": "pnpm audit --audit-level high",
-		"verify": "bash template/core/files/scripts/verify.sh --source && pnpm format:check && pnpm lint && pnpm test && pnpm run audit",
+		"template:lock": "bash scripts/template-lock.sh --update",
+		"verify": "bash template/core/files/scripts/verify.sh --source && bash scripts/template-lock.sh --check && pnpm format:check && pnpm lint && pnpm test && pnpm run audit",
 		"review:dev": "node tooling/pr-review/review.mjs dev",
 		"review:holdout": "node tooling/pr-review/review.mjs holdout",
 		"review:blind": "node tooling/pr-review/review.mjs blind"

@@ -1,0 +1,42 @@
+name: Bundle budgets
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: bundle-budgets-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  budgets:
+    name: Bundle budgets
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      NEXT_TELEMETRY_DISABLED: "1"
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - name: Install pinned TypeScript tooling
+        run: bash scripts/setup-typescript.sh
+      - name: Analyze client bundles and enforce budgets
+        run: |
+          export PATH="$GITHUB_WORKSPACE/.agent-rules/tools/node/bin:$PATH"
+          export COREPACK_HOME="$GITHUB_WORKSPACE/.agent-rules/tools/corepack"
+          pnpm run bundle:analyze
+          pnpm run bundle:check
+      - name: Keep the analyzer report
+        if: ${{ always() }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: bundle-analysis
+          path: .next/diagnostics/analyze/
+          include-hidden-files: true
+          if-no-files-found: ignore
+          retention-days: 14

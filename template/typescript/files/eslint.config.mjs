@@ -1,6 +1,7 @@
 import js from "@eslint/js";
 import globals from "globals";
 import tseslint from "typescript-eslint";
+// agent-rules:addon-imports
 import { housePlugin } from "./tooling/eslint-rules/index.mjs";
 
 const product = [
@@ -9,7 +10,7 @@ const product = [
 	"test/**/*.{js,mjs,ts,tsx}",
 ];
 
-export default [
+const config = [
 	{
 		ignores: [
 			"build/**",
@@ -23,6 +24,45 @@ export default [
 	},
 	js.configs.recommended,
 	...tseslint.configs.recommended,
+	// agent-rules:addon-configs
+	{
+		files: ["**/*.{js,jsx,mjs,cjs,ts,tsx,mts,cts}"],
+		rules: {
+			complexity: ["error", 20],
+			"@typescript-eslint/naming-convention": [
+				"error",
+				{
+					selector: "variable",
+					format: ["camelCase", "PascalCase"],
+					leadingUnderscore: "allow",
+				},
+				{
+					selector: "variable",
+					modifiers: ["const"],
+					format: ["camelCase", "PascalCase", "UPPER_CASE"],
+					leadingUnderscore: "allow",
+				},
+				{
+					selector: "function",
+					format: ["camelCase", "PascalCase"],
+				},
+				{
+					selector: "function",
+					filter: {
+						regex: "^(GET|HEAD|POST|PUT|DELETE|CONNECT|OPTIONS|TRACE|PATCH)$",
+						match: true,
+					},
+					format: ["UPPER_CASE"],
+				},
+				{
+					selector: "parameter",
+					format: ["camelCase", "PascalCase"],
+					leadingUnderscore: "allow",
+				},
+				{ selector: "typeLike", format: ["PascalCase"] },
+			],
+		},
+	},
 	{
 		files: ["tooling/**/*.mjs", "test/**/*.mjs", "*.config.mjs"],
 		languageOptions: { globals: { ...globals.node } },
@@ -64,3 +104,5 @@ export default [
 		rules: { "house/meaningful-tests": "error" },
 	},
 ];
+
+export default config;

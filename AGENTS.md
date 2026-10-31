@@ -23,6 +23,7 @@ Build production software a real user runs. Do not cut requested behavior withou
 | Rust output | changing Rust materialization or enforcement | `template/rust/files/Cargo.toml`, `template/rust/files/scripts/verify-rust.sh` |
 | TypeScript output | changing TypeScript materialization or enforcement | `template/typescript/files/package.json`, `template/typescript/files/scripts/verify-typescript.sh` |
 | Repository workflow | before committing, synchronizing, or preparing a pull request | `README.md` |
+| Add-ons | changing an add-on, a combination, or the init composer | `template/addons`, `template/init/compose.mjs`, `scripts/template-lock.sh` |
 | Rule-owner review | changing reviewer behavior | `tooling/pr-review/README.md` |
 
 ## Commands
@@ -35,3 +36,6 @@ Build production software a real user runs. Do not cut requested behavior withou
 | Initialize Rust repository | `./init.sh rust` |
 | Initialize TypeScript repository | `./init.sh typescript` |
 | Initialize mixed repository | `./init.sh rust,typescript` |
+| Initialize with add-ons | `./init.sh typescript --with nextjs,tailwind,database=postgresql` |
+| Preview without changes | `./init.sh typescript --with react --dry-run` |
+| Refresh the add-on lockfile | `pnpm template:lock` |

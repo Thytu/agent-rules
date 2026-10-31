@@ -8,10 +8,11 @@ dependencies = []
 dev = [
   "deptry==0.25.1",
   "pip-audit==2.10.1",
-  "pylint==4.0.7",
+  "pylint==4.0.9",
   "pyright[nodejs]==1.1.411",
   "pytest==9.1.1",
   "pytest-asyncio==1.4.0",
+  "pytest-cov==7.1.0",
   "ruff==0.16.4",
 ]
 
@@ -39,6 +40,15 @@ addopts = ["--strict-config", "--strict-markers"]
 asyncio_mode = "strict"
 pythonpath = ["src"]
 testpaths = ["test", "tests"]
+
+[tool.coverage.run]
+branch = true
+source = ["src"]
+
+[tool.coverage.report]
+fail_under = 80
+show_missing = true
+skip_empty = true
 
 [tool.ruff]
 line-length = 100
