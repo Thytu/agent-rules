@@ -6,6 +6,19 @@ import path from "node:path";
 import { type TestContext, test } from "node:test";
 
 const script = path.resolve("tooling/check-bundle-budgets.mjs");
+// Child processes get no credentials, and none of the GIT_* variables a Git
+// hook exports, which would aim Git at the commit being made.
+const withheld = Object.fromEntries(
+	Object.keys(process.env)
+		.filter(
+			(name) =>
+				name.startsWith("GIT_") ||
+				/TOKEN|SECRET|PASSWORD|CREDENTIAL|API_KEY|ACCESS_KEY|PRIVATE_KEY/i.test(
+					name,
+				),
+		)
+		.map((name) => [name, undefined]),
+);
 const budgets = {
 	defaultRoute: { maxBytes: 1000, maxCompressedBytes: 500 },
 	routes: {},
@@ -13,12 +26,17 @@ const budgets = {
 	packages: { next: 800 },
 };
 
-// Writes analyzer output shaped like `pnpm bundle:analyze` into a scratch
-// project directory and returns it.
 function project(
 	context: TestContext,
-	{ routeBytes = 900, nextBytes = 700, routeCount = 1 } = {},
+	options: {
+		routeBytes?: number;
+		nextBytes?: number;
+		graphRoutes?: string[];
+		routeCount?: number;
+	} = {},
 ) {
+	const { routeBytes = 900, nextBytes = 700, graphRoutes = ["/"] } = options;
+	const routeCount = options.routeCount ?? graphRoutes.length;
 	const root = fs.mkdtempSync(path.join(os.tmpdir(), "bundle-budgets-"));
 	context.after(() => fs.rmSync(root, { recursive: true, force: true }));
 	const analyze = path.join(root, ".next", "diagnostics", "analyze");
@@ -40,7 +58,7 @@ function project(
 			route_count: routeCount,
 			selected_routes: routeCount,
 		},
-		{ type: "route", route: "/" },
+		...graphRoutes.map((route) => ({ type: "route", route })),
 		{
 			type: "part",
 			filename: "[client-fs]/chunk.js",
@@ -65,7 +83,7 @@ function check(cwd: string) {
 	return spawnSync(process.execPath, [script], {
 		cwd,
 		encoding: "utf8",
-		env: { ...process.env, GITHUB_STEP_SUMMARY: "" },
+		env: { ...process.env, ...withheld, GITHUB_STEP_SUMMARY: "" },
 	});
 }
 
@@ -87,6 +105,27 @@ test("a browser package over its budget fails", (context) => {
 	const result = check(project(context, { nextBytes: 801 }));
 	assert.equal(result.status, 1);
 	assert.match(result.stderr, /package next exceeds its browser budget/);
+});
+
+test("an analyzer record type the check does not model fails it", (context) => {
+	const root = project(context);
+	const graph = path.join(root, ".next/diagnostics/analyze/bundle-graph.jsonl");
+	fs.appendFileSync(
+		graph,
+		`\n${JSON.stringify({ type: "edge-chunk", size: 9 })}`,
+	);
+	const result = check(root);
+	assert.equal(result.status, 1);
+	assert.match(result.stderr, /edge-chunk/);
+});
+
+test("an analyzed route missing from the summaries fails the check", (context) => {
+	const result = check(project(context, { graphRoutes: ["/", "/admin"] }));
+	assert.equal(result.status, 1);
+	assert.match(
+		result.stderr,
+		/the route summaries omit analyzed routes: \/admin/,
+	);
 });
 
 test("a filtered analyzer export is rejected instead of passing", (context) => {

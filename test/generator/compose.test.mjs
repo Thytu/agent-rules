@@ -10,12 +10,12 @@ import {
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { test } from "node:test";
+import { isolatedEnvironment } from "./environment.mjs";
 import { fileURLToPath } from "node:url";
 
 const sourceRoot = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 const compose = join(sourceRoot, "template", "init", "compose.mjs");
 
-// A minimal template and output tree for the composer.
 function fixture(t, addons) {
 	const root = mkdtempSync(join(tmpdir(), "agent-rules-compose-"));
 	t.after(() => rmSync(root, { recursive: true, force: true }));
@@ -44,7 +44,10 @@ function fixture(t, addons) {
 		for (const [file, content] of Object.entries(files))
 			write(`template/addons/${unit}/${file}`, content);
 	const run = (...args) =>
-		spawnSync(process.execPath, [compose, ...args], { encoding: "utf8" });
+		spawnSync(process.execPath, [compose, ...args], {
+			encoding: "utf8",
+			env: isolatedEnvironment,
+		});
 	const read = (file) => readFileSync(join(root, file), "utf8");
 	return {
 		root,

@@ -25,6 +25,16 @@ const summariesSchema = z
 		}),
 	)
 	.nonempty();
+// The analyzer graph's record types as of Next.js 16.4. A new type may carry
+// bytes this check would not count, so it fails until the type is modeled.
+const recordTypes = new Set([
+	"meta",
+	"route",
+	"part",
+	"module",
+	"output",
+	"group",
+]);
 const recordSchema = z.object({ type: z.string() }).passthrough();
 const metaSchema = z.object({
 	schema_version: z.literal(1),
@@ -57,6 +67,10 @@ async function packageSizes(graphPath) {
 	});
 	for await (const line of lines) {
 		const record = recordSchema.parse(JSON.parse(line));
+		if (!recordTypes.has(record.type))
+			throw new Error(
+				`unknown analyzer record type "${record.type}"; model it in tooling/check-bundle-budgets.mjs before trusting this export`,
+			);
 		if (record.type === "meta") {
 			if (metadata) throw new Error("the analyzer graph has two meta records");
 			metadata = metaSchema.parse(record);
@@ -81,7 +95,7 @@ async function packageSizes(graphPath) {
 		routes.size !== metadata.route_count
 	)
 		throw new Error("expected a complete, unfiltered analyzer export");
-	return packages;
+	return { packages, routes };
 }
 
 function cell(value) {
@@ -106,9 +120,16 @@ async function main() {
 			),
 		),
 	);
-	const packages = await packageSizes(
+	const { packages, routes } = await packageSizes(
 		path.join(directory, "bundle-graph.jsonl"),
 	);
+	// Summaries may add framework routes; every analyzed route must be there.
+	const summarized = new Set(summaries.map(({ route }) => route));
+	const unsummarized = [...routes].filter((route) => !summarized.has(route));
+	if (unsummarized.length > 0)
+		throw new Error(
+			`the route summaries omit analyzed routes: ${unsummarized.join(", ")}`,
+		);
 	const violations = [];
 	const report = [
 		"## Client bundle budgets",

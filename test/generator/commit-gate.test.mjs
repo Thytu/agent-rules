@@ -14,6 +14,7 @@ import {
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { test } from "node:test";
+import { isolatedEnvironment } from "./environment.mjs";
 import { fileURLToPath } from "node:url";
 
 // The commit gate (scripts/verify-commit.sh, run by the pre-commit and
@@ -26,11 +27,8 @@ const generated = resolve(
 function repository(t) {
 	const root = mkdtempSync(join(tmpdir(), "commit-gate-"));
 	t.after(() => rmSync(root, { recursive: true, force: true }));
-	// Hooks export GIT_DIR; inherited, it would point Git at this checkout.
 	const env = {
-		...Object.fromEntries(
-			Object.entries(process.env).filter(([name]) => !name.startsWith("GIT_")),
-		),
+		...isolatedEnvironment,
 		GIT_CONFIG_NOSYSTEM: "1",
 		GIT_CONFIG_GLOBAL: join(root, ".git", "empty-config"),
 	};

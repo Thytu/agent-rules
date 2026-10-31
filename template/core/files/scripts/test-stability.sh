@@ -15,14 +15,25 @@ for language in python rust typescript; do
 done
 [ "${#languages[@]}" -gt 0 ] || { echo "test-stability: no language tooling is selected"; exit 0; }
 
+crashed=()
 for language in "${languages[@]}"; do
 	for run in $(seq 1 "$runs"); do
 		echo "test-stability: $language run $run of $runs"
-		# A failing run is an outcome to compare, not a reason to stop.
-		"$root/scripts/verify-$language.sh" --test-results "$work/$language.$run" || true
+		# Failing tests are outcomes to compare. A run that exits nonzero without
+		# reporting any test crashed before its tests ran, and fails the check.
+		status=0
+		"$root/scripts/verify-$language.sh" --test-results "$work/$language.$run" || status=$?
 		[ -f "$work/$language.$run" ] || : > "$work/$language.$run"
+		if [ "$status" -ne 0 ] && [ ! -s "$work/$language.$run" ]; then
+			crashed+=("$language run $run exited with status $status before reporting any test")
+		fi
 	done
 done
+if [ "${#crashed[@]}" -gt 0 ]; then
+	printf 'test-stability: %s\n' "${crashed[@]}" >&2
+	[ -z "${GITHUB_STEP_SUMMARY:-}" ] || printf -- '- %s\n' "${crashed[@]}" >> "$GITHUB_STEP_SUMMARY"
+	exit 1
+fi
 
 report="$work/report.md"
 status=0

@@ -72,7 +72,7 @@ if (!fs.existsSync(migrations)) {
 
 // drizzle-kit validates the journal and snapshots; it creates the migrations
 // folder when it is missing, so it runs only once migrations exist.
-execFileSync("drizzle-kit", ["check"], { stdio: "inherit" });
+execFileSync("drizzle-kit", ["check"], { stdio: "inherit", timeout: 120_000 });
 
 const errors = [];
 if (revisionExists("HEAD")) errors.push(...rewrites("HEAD"));
@@ -81,6 +81,10 @@ if (revisionExists("HEAD")) errors.push(...rewrites("HEAD"));
 if (revisionExists("origin/main") && revisionExists("HEAD")) {
 	const base = git("merge-base", "origin/main", "HEAD");
 	errors.push(...rewrites(base, "HEAD"));
+} else {
+	console.log(
+		"check-migrations: skipped the comparison with origin/main, which this checkout does not have",
+	);
 }
 
 if (errors.length > 0) {

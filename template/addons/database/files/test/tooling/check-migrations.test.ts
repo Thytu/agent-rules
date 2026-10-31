@@ -6,6 +6,19 @@ import path from "node:path";
 import { type TestContext, test } from "node:test";
 
 const script = path.resolve("tooling/check-migrations.mjs");
+// Child processes get no credentials, and none of the GIT_* variables a Git
+// hook exports, which would aim Git at the commit being made.
+const withheld = Object.fromEntries(
+	Object.keys(process.env)
+		.filter(
+			(name) =>
+				name.startsWith("GIT_") ||
+				/TOKEN|SECRET|PASSWORD|CREDENTIAL|API_KEY|ACCESS_KEY|PRIVATE_KEY/i.test(
+					name,
+				),
+		)
+		.map((name) => [name, undefined]),
+);
 const journal = (tags: string[]) =>
 	`${JSON.stringify({
 		version: "7",
@@ -19,8 +32,6 @@ const journal = (tags: string[]) =>
 		})),
 	})}\n`;
 
-// A repository with one committed migration, and a drizzle-kit stub whose exit
-// status the test controls.
 function repository(context: TestContext) {
 	const root = fs.mkdtempSync(path.join(os.tmpdir(), "check-migrations-"));
 	context.after(() => fs.rmSync(root, { recursive: true, force: true }));
@@ -31,16 +42,9 @@ function repository(context: TestContext) {
 		'#!/bin/sh\nexit "${DRIZZLE_STATUS:-0}"\n',
 	);
 	fs.chmodSync(path.join(bin, "drizzle-kit"), 0o755);
-	// The commit gate runs this test inside a Git hook, which exports GIT_DIR
-	// and GIT_INDEX_FILE; inherited, they would aim the scratch repository's
-	// commands at the commit being made.
-	const hookGit = Object.keys(process.env)
-		.filter((name) => name.startsWith("GIT_"))
-		.map((name) => [name, undefined]);
-	// A child process receives no variable whose value is undefined.
 	const env = {
 		...process.env,
-		...Object.fromEntries(hookGit),
+		...withheld,
 		PATH: `${bin}${path.delimiter}${process.env.PATH ?? ""}`,
 		GIT_CONFIG_GLOBAL: path.join(root, ".gitconfig"),
 		GIT_CONFIG_NOSYSTEM: "1",
@@ -101,6 +105,7 @@ test("a new migration with an appended journal entry passes", (context) => {
 	repo.git("add", ".");
 	const result = repo.check();
 	assert.equal(result.status, 0, result.stderr);
+	assert.match(result.stdout, /skipped the comparison with origin\/main/);
 });
 
 test("editing or deleting a committed migration fails", (context) => {

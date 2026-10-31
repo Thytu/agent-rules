@@ -5,6 +5,7 @@ import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { test } from "node:test";
+import { isolatedEnvironment } from "./environment.mjs";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 
@@ -151,10 +152,7 @@ test("workflow triggers use least privilege", () => {
 test("merge-base diff excludes base-only changes and expands renames", (t) => {
 	const repo = mkdtempSync(join(tmpdir(), "agent-rules-diff-"));
 	t.after(() => rmSync(repo, { recursive: true, force: true }));
-	// Hooks export GIT_DIR; inherited, it would point these commands at this checkout.
-	const env = Object.fromEntries(
-		Object.entries(process.env).filter(([name]) => !name.startsWith("GIT_")),
-	);
+	const env = isolatedEnvironment;
 	const git = (...args) =>
 		execFileSync(
 			"git",

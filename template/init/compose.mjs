@@ -1,13 +1,7 @@
-// Composes the TypeScript output of an initialization: merges each selected
-// add-on's JSON fragments into the base configuration files and fills the
-// add-on markers in eslint.config.mjs and scripts/verify-typescript.sh.
-//
-//   node compose.mjs apply TEMPLATE OUT UNIT...
-//   node compose.mjs superset TEMPLATE FILE
-//
-// A unit is an add-on directory under TEMPLATE/addons: "react", a variant such as
-// "database@sqlite", or a combination such as "nextjs+tailwind". Units are
-// applied in the order given; init.sh resolves that order.
+// Composes the TypeScript output of an initialization from the selected units.
+// A unit is an add-on directory under TEMPLATE/addons: an add-on ("react"), a
+// variant for one parameter value ("database@sqlite"), or a combination applied
+// when all its members are selected ("nextjs+tailwind"). init.sh orders them.
 import fs from "node:fs";
 import path from "node:path";
 
@@ -97,8 +91,6 @@ function lines(file) {
 		.filter((line) => line.trim() !== "");
 }
 
-// Replaces the single line holding `marker` with `replacement` lines, keeping
-// the marker's indentation; no replacement removes the line.
 function fillMarker(file, marker, replacement) {
 	const text = fs.readFileSync(file, "utf8").split("\n");
 	const index = text.findIndex((line) => line.trim() === marker);

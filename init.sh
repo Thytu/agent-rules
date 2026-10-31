@@ -46,7 +46,6 @@ language_summary() {
 	esac
 }
 
-# conf UNIT KEY prints KEY from template/addons/UNIT/addon.conf.
 conf() {
 	local file="$root/template/addons/$1/addon.conf"
 	[ -f "$file" ] || return 0
@@ -545,7 +544,7 @@ if contains typescript "$selected_languages"; then
 		cd "$out"
 		# The committed lockfile pins every add-on; pruning keeps only this
 		# selection's packages, at those exact versions.
-		pnpm install --lockfile-only --ignore-scripts > "$tmp/lock.log" 2>&1 || { cat "$tmp/lock.log" >&2; exit 1; }
+		node "$tools/run-bounded.cjs" 300000 pnpm install --lockfile-only --ignore-scripts > "$tmp/lock.log" 2>&1 || { cat "$tmp/lock.log" >&2; exit 1; }
 	) || fail "could not compose the TypeScript configuration; nothing was changed"
 fi
 

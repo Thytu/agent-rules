@@ -18,19 +18,9 @@ import { tmpdir } from "node:os";
 import { dirname, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { test } from "node:test";
+import { isolatedEnvironment } from "./environment.mjs";
 
 const sourceRoot = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
-// Git exports GIT_DIR and friends to hooks; a test that inherited them would
-// run its Git commands against this checkout instead of its own repository.
-const isolatedEnvironment = Object.fromEntries(
-	Object.entries(globalThis.process.env).filter(
-		([name]) =>
-			!name.startsWith("GIT_") &&
-			!/(?:TOKEN|SECRET|PASSWORD|CREDENTIAL|API_KEY|ACCESS_KEY|PRIVATE_KEY)/i.test(
-				name,
-			),
-	),
-);
 const inheritedPath = isolatedEnvironment.PATH ?? "";
 
 function git(root, ...args) {

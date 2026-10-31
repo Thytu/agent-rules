@@ -12,6 +12,7 @@ import {
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { test } from "node:test";
+import { isolatedEnvironment } from "./environment.mjs";
 import { fileURLToPath } from "node:url";
 
 const script = resolve(
@@ -19,16 +20,15 @@ const script = resolve(
 	"../../template/core/files/scripts/test-stability.sh",
 );
 
-// A repository whose stand-in language verifier prints the results of run N
-// from a list, so each case controls what every run reports.
-function repository(t, runs) {
+function repository(t, runs, statuses = []) {
 	const root = mkdtempSync(join(tmpdir(), "agent-rules-stability-"));
 	t.after(() => rmSync(root, { recursive: true, force: true }));
 	mkdirSync(join(root, "scripts"));
 	copyFileSync(script, join(root, "scripts", "test-stability.sh"));
-	runs.forEach((lines, index) =>
-		writeFileSync(join(root, `run-${index + 1}`), lines.join("\n")),
-	);
+	runs.forEach((lines, index) => {
+		writeFileSync(join(root, `run-${index + 1}`), lines.join("\n"));
+		writeFileSync(join(root, `status-${index + 1}`), `${statuses[index] ?? 0}`);
+	});
 	writeFileSync(
 		join(root, "scripts", "verify-typescript.sh"),
 		`#!/usr/bin/env bash
@@ -37,8 +37,8 @@ root="$(cd "$(dirname "$0")/.." && pwd -P)"
 count=$(( $(cat "$root/count" 2>/dev/null || echo 0) + 1 ))
 echo "$count" > "$root/count"
 [ "$1" = --test-results ] || exit 9
-[ -s "$root/run-$count" ] || exit 3
 cp "$root/run-$count" "$2"
+exit "$(cat "$root/status-$count")"
 `,
 	);
 	chmodSync(join(root, "scripts", "verify-typescript.sh"), 0o755);
@@ -48,7 +48,7 @@ cp "$root/run-$count" "$2"
 		[join(root, "scripts", "test-stability.sh")],
 		{
 			encoding: "utf8",
-			env: { ...process.env, GITHUB_STEP_SUMMARY: summary },
+			env: { ...isolatedEnvironment, GITHUB_STEP_SUMMARY: summary },
 		},
 	);
 	return { result, summary: () => readFileSync(summary, "utf8") };
@@ -86,11 +86,21 @@ test("a test whose outcome changes is reported per run and fails the check", (t)
 	assert.match(summary(), /## Flaky tests/);
 });
 
-test("a run that crashes marks its tests absent", (t) => {
-	const { result } = repository(t, [stable, [], stable]);
+test("a test missing from one completed run is reported absent there", (t) => {
+	const { result } = repository(t, [stable, [stable[1]], stable], [1, 1, 1]);
 	assert.equal(result.status, 1);
 	assert.match(
 		result.stdout,
 		/\| typescript \| `a > adds` \| passed \| absent \| passed \|/,
 	);
+});
+
+test("a run that exits nonzero before reporting any test fails the check", (t) => {
+	const { result, summary } = repository(t, [stable, [], stable], [1, 3, 1]);
+	assert.equal(result.status, 1);
+	assert.match(
+		result.stderr,
+		/typescript run 2 exited with status 3 before reporting any test/,
+	);
+	assert.match(summary(), /typescript run 2 exited with status 3/);
 });

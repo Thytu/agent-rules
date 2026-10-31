@@ -13,15 +13,13 @@ import {
 import { tmpdir } from "node:os";
 import { dirname, join, relative, resolve } from "node:path";
 import { test } from "node:test";
+import { isolatedEnvironment } from "./environment.mjs";
 import { fileURLToPath } from "node:url";
 
 // The command-line contract of init.sh: every request that cannot proceed says
 // why and how to fix it, and only a confirmed, valid request changes anything.
 const sourceRoot = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
-// Hooks export GIT_DIR; inherited, it would point Git at this checkout.
-const env = Object.fromEntries(
-	Object.entries(process.env).filter(([name]) => !name.startsWith("GIT_")),
-);
+const env = isolatedEnvironment;
 
 function git(root, ...args) {
 	return execFileSync(
