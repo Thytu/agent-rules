@@ -13,7 +13,6 @@
 		"lint": "eslint . --max-warnings 0",
 		"typecheck": "tsc --noEmit",
 		"test": "c8 node --import=tsx --test 'test/eslint/**/*.test.mjs' 'test/**/*.test.ts' 'test/**/*.test.tsx'",
-		"test:results": "node --import=tsx --test --test-reporter=spec --test-reporter-destination=stderr --test-reporter=./tooling/test-results-reporter.mjs --test-reporter-destination=stdout 'test/eslint/**/*.test.mjs' 'test/**/*.test.ts' 'test/**/*.test.tsx'",
 		"audit": "pnpm audit --audit-level high",
 		"unused": "knip"
 	},

@@ -29,5 +29,4 @@ Build production software a real user runs. Do not cut requested behavior withou
 | Infrastructure gate | `bash scripts/verify.sh --structure-only` |
 | Commit gate (every commit; the staged tree) | `bash scripts/verify.sh --commit` |
 | Full gate (every push and pull request) | `bash scripts/verify.sh` |
-| Flaky-test check (CI on `main`) | `bash scripts/test-stability.sh` |
 | Apply GitHub settings | `bash scripts/setup-github.sh` |

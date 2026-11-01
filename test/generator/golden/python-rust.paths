@@ -46,7 +46,6 @@ scripts/setup-github.sh
 scripts/setup-python.sh
 scripts/setup-rust.sh
 scripts/setup.sh
-scripts/test-stability.sh
 scripts/verify-commit.sh
 scripts/verify-mode.sh
 scripts/verify-python.sh

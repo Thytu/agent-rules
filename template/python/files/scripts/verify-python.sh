@@ -20,14 +20,6 @@ has_tests=false
 ! has_python src || has_source=true
 for directory in test tests; do ! has_python "$directory" || has_tests=true; done
 
-if [ "$mode" = results ]; then
-	[ "$has_tests" = true ] || { : > "$results"; exit 0; }
-	# pytest -rA lists every outcome as "OUTCOME node-id[ - detail]".
-	uv run --frozen pytest -rA -p no:cacheprovider --no-header -q | tee /dev/stderr |
-		awk '$1 ~ /^(PASSED|FAILED|ERROR|XFAIL|XPASS)$/ { outcome = tolower($1); $1 = ""; sub(/^ /, ""); sub(/ - .*$/, ""); print outcome "\t" $0 }' > "$results"
-	exit 0
-fi
-
 uv lock --check
 uv run --frozen ruff format --check .
 uv run --frozen ruff check .
